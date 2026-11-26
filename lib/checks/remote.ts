@@ -1,0 +1,269 @@
+import type { CheckResult, Extracted, Listing, Signal } from "../types";
+
+const LISTING_HOSTS = /gumtree\.com\.au|ebayimg|classistatic/;
+const host = (u: string) => {
+  try {
+    return new URL(u).hostname.replace(/^www\./, "");
+  } catch {
+    return u;
+  }
+};
+const SCAM_WORDS = /\b(scam|scammer|scammed|fraud|fake|ripped off|beware|warning|stolen)\b/i;
+
+// ---------------------------------------------------------------- images ---
+
+/** Reverse image search via Google Cloud Vision "WEB_DETECTION". */
+export async function imageCheck(l: Listing): Promise<CheckResult> {
+  const base = { id: "images", name: "Reverse image search" };
+  const key = process.env.GOOGLE_VISION_API_KEY;
+  if (!key) return { ...base, status: "skipped", note: "GOOGLE_VISION_API_KEY not set", signals: [] };
+  if (!l.images.length) return { ...base, status: "skipped", note: "No photos supplied", signals: [] };
+
+  const images = l.images.slice(0, 4);
+  const requests = images.map((src) => ({
+    image: src.startsWith("data:") ? { content: src.split(",")[1] } : { source: { imageUri: src } },
+    features: [{ type: "WEB_DETECTION", maxResults: 15 }],
+  }));
+
+  try {
+    const res = await fetch(`https://vision.googleapis.com/v1/images:annotate?key=${key}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ requests }),
+      signal: AbortSignal.timeout(20000),
+    });
+    if (!res.ok) throw new Error(`Vision API HTTP ${res.status}`);
+    const data = await res.json();
+    const signals: Signal[] = [];
+    let anyChecked = false;
+
+    data.responses?.forEach((r: any, i: number) => {
+      if (r.error) return;
+      anyChecked = true;
+      const pages: { url: string; pageTitle?: string; fullMatchingImages?: unknown[] }[] =
+        r.webDetection?.pagesWithMatchingImages || [];
+      const elsewhere = pages.filter((p) => !LISTING_HOSTS.test(p.url));
+      const full = elsewhere.filter((p) => p.fullMatchingImages?.length);
+      const links = elsewhere.slice(0, 6).map((p) => ({ title: p.pageTitle?.replace(/<[^>]+>/g, "") || host(p.url), url: p.url }));
+      if (full.length >= 1) {
+        signals.push({
+          points: full.length >= 3 ? -30 : -22,
+          label: `Photo ${i + 1} appears on ${full.length} other website${full.length > 1 ? "s" : ""}`,
+          detail: "Scammers usually steal photos from real breeders. Check whether these pages belong to the same seller.",
+          links,
+        });
+      } else if (elsewhere.length) {
+        signals.push({ points: -6, label: `Photo ${i + 1} has partial matches online`, detail: "Could be a cropped/edited copy. Review the links.", links });
+      }
+    });
+
+    if (!anyChecked) return { ...base, status: "error", note: "Vision could not read any of the photos", signals };
+    if (!signals.length) signals.push({ points: 6, label: "No copies of the photos found elsewhere online" });
+    return { ...base, status: "ran", signals };
+  } catch (e) {
+    return { ...base, status: "error", note: (e as Error).message, signals: [] };
+  }
+}
+
+// ------------------------------------------------------------ web search ---
+
+type BraveResult = { title: string; url: string; description?: string };
+
+async function brave(q: string): Promise<BraveResult[]> {
+  const key = process.env.BRAVE_SEARCH_API_KEY!;
+  const u = new URL("https://api.search.brave.com/res/v1/web/search");
+  u.searchParams.set("q", q);
+  u.searchParams.set("count", "10");
+  u.searchParams.set("country", "AU");
+  const res = await fetch(u, {
+    headers: { accept: "application/json", "X-Subscription-Token": key },
+    signal: AbortSignal.timeout(10000),
+  });
+  if (!res.ok) throw new Error(`Brave Search HTTP ${res.status}`);
+  const data = await res.json();
+  return (data.web?.results || []).map((r: any) => ({
+    title: String(r.title || "").replace(/<[^>]+>/g, ""),
+    url: r.url,
+    description: String(r.description || "").replace(/<[^>]+>/g, ""),
+  }));
+}
+
+/** Pick a distinctive sentence from the description to detect copy-paste ads. */
+function fingerprintSentence(desc: string) {
+  const sentences = desc
+    .split(/(?<=[.!?])\s+|\n+/)
+    .map((s) => s.trim().replace(/["“”]/g, ""))
+    .filter((s) => s.split(/\s+/).length >= 8 && !/\$|\d{6,}|@/.test(s));
+  sentences.sort((a, b) => b.length - a.length);
+  return sentences[0]?.split(/\s+/).slice(0, 14).join(" ");
+}
+
+export async function webCheck(l: Listing, x: Extracted): Promise<CheckResult> {
+  const base = { id: "web", name: "Online text, name & phone search" };
+  if (!process.env.BRAVE_SEARCH_API_KEY)
+    return { ...base, status: "skipped", note: "BRAVE_SEARCH_API_KEY not set", signals: [] };
+
+  const signals: Signal[] = [];
+  const jobs: Promise<void>[] = [];
+
+  const sentence = fingerprintSentence(l.description || l.rawText);
+  if (sentence) {
+    jobs.push(
+      brave(`"${sentence}"`).then((rs) => {
+        const other = rs.filter((r) => !LISTING_HOSTS.test(r.url) && (!l.url || !r.url.startsWith(l.url)));
+        if (other.length >= 2)
+          signals.push({
+            points: -18,
+            label: `Ad wording appears on ${other.length} other web pages`,
+            detail: `Copy-pasted text is a strong sign of a scam template. Searched: "${sentence}"`,
+            links: other.slice(0, 5).map((r) => ({ title: r.title || host(r.url), url: r.url })),
+          });
+        else if (other.length === 1)
+          signals.push({ points: -5, label: "Ad wording found on one other page", links: [{ title: other[0].title, url: other[0].url }] });
+      })
+    );
+  }
+
+  const identifiers = [...x.phones, ...x.emails].slice(0, 4);
+  for (const id of identifiers) {
+    jobs.push(
+      brave(`"${id}"`).then((rs) => {
+        const scammy = rs.filter((r) => SCAM_WORDS.test(`${r.title} ${r.description}`));
+        if (scammy.length)
+          signals.push({
+            points: -30,
+            label: `${id} appears in online scam reports/warnings`,
+            detail: "Read these pages yourself — the match may be coincidental, but treat it seriously.",
+            links: scammy.slice(0, 5).map((r) => ({ title: r.title, url: r.url })),
+          });
+        else if (rs.filter((r) => !LISTING_HOSTS.test(r.url)).length >= 3)
+          signals.push({
+            points: 0,
+            label: `${id} is used on other sites`,
+            detail: "Check these are the same seller and breed.",
+            links: rs.slice(0, 5).map((r) => ({ title: r.title, url: r.url })),
+          });
+      })
+    );
+  }
+
+  const name = x.businessName || l.sellerName;
+  if (name && name.length >= 4) {
+    jobs.push(
+      brave(`"${name}" (scam OR fraud OR fake OR "ripped off")`).then((rs) => {
+        const scammy = rs.filter((r) => SCAM_WORDS.test(`${r.title} ${r.description}`) && r.title.toLowerCase().includes(name.toLowerCase().split(" ")[0]));
+        if (scammy.length)
+          signals.push({
+            // Names collide — weight lower than a phone/email match and never call it proof.
+            points: x.businessName ? -15 : -6,
+            label: `Search results mention "${name}" alongside scam/fraud terms`,
+            detail: "Names are often shared by unrelated people or businesses. Read the pages before drawing conclusions.",
+            links: scammy.slice(0, 5).map((r) => ({ title: r.title, url: r.url })),
+          });
+      })
+    );
+  }
+
+  const results = await Promise.allSettled(jobs);
+  const failed = results.filter((r) => r.status === "rejected") as PromiseRejectedResult[];
+  if (failed.length === results.length && results.length)
+    return { ...base, status: "error", note: String(failed[0].reason?.message || failed[0].reason), signals };
+  if (!jobs.length) return { ...base, status: "skipped", note: "Nothing distinctive to search for", signals };
+  if (!signals.length) signals.push({ points: 4, label: "No scam reports or copy-paste matches found online" });
+  return { ...base, status: "ran", signals };
+}
+
+// ---------------------------------------------------------------- social ---
+
+export async function socialCheck(l: Listing, x: Extracted): Promise<CheckResult> {
+  const base = { id: "social", name: "Facebook & Instagram presence" };
+  const terms = [x.businessName, ...x.phones.slice(0, 1)].filter(Boolean) as string[];
+  if (!terms.length) return { ...base, status: "na", note: "No business name or phone to look up", signals: [] };
+  if (!process.env.BRAVE_SEARCH_API_KEY)
+    return { ...base, status: "skipped", note: "BRAVE_SEARCH_API_KEY not set", signals: [] };
+
+  try {
+    const q = terms.map((t) => `"${t}"`).join(" OR ");
+    const [fb, ig] = await Promise.all([brave(`${q} site:facebook.com`), brave(`${q} site:instagram.com`)]);
+    const links = [...fb, ...ig].slice(0, 8).map((r) => ({ title: r.title || host(r.url), url: r.url }));
+    const signals: Signal[] = [];
+    if (links.length)
+      signals.push({
+        // Presence is weak evidence: fake pages are cheap. Absence matters more for a claimed business.
+        points: 2,
+        label: `Found ${links.length} Facebook/Instagram result${links.length > 1 ? "s" : ""}`,
+        detail: "Open them: look for page age, real reviews/comments, past litters, and consistent photos. Brand-new pages with no history are a warning sign.",
+        links,
+      });
+    else if (x.businessName)
+      signals.push({ points: -6, label: `No Facebook or Instagram presence found for "${x.businessName}"`, detail: "Established breeders usually have some social footprint." });
+    return { ...base, status: "ran", signals };
+  } catch (e) {
+    return { ...base, status: "error", note: (e as Error).message, signals: [] };
+  }
+}
+
+// ---------------------------------------------------------------- domain ---
+
+/** Website age via RDAP (free, no key). Scam breeder sites are usually weeks old. */
+export async function domainCheck(x: Extracted): Promise<CheckResult> {
+  const base = { id: "domain", name: "Seller website age" };
+  if (!x.urls.length) return { ...base, status: "na", note: "No website in the ad", signals: [] };
+  const signals: Signal[] = [];
+  for (const u of x.urls.slice(0, 2)) {
+    const domain = host(u.startsWith("http") ? u : `https://${u}`);
+    try {
+      const res = await fetch(`https://rdap.org/domain/${domain}`, { signal: AbortSignal.timeout(8000) });
+      if (!res.ok) continue;
+      const data = await res.json();
+      const reg = data.events?.find((e: any) => e.eventAction === "registration")?.eventDate;
+      if (!reg) continue;
+      const days = Math.round((Date.now() - new Date(reg).getTime()) / 86400000);
+      const when = new Date(reg).toLocaleDateString("en-AU");
+      if (days < 180)
+        signals.push({ points: -20, label: `${domain} was registered only ${days} days ago`, detail: `Registered ${when}. Fake breeder websites are typically brand new.` });
+      else if (days > 730) signals.push({ points: 4, label: `${domain} has existed since ${when}` });
+      else signals.push({ points: 0, label: `${domain} registered ${when}` });
+    } catch {
+      /* .au domains may not be in RDAP bootstrap; ignore */
+    }
+  }
+  return { ...base, status: signals.length ? "ran" : "error", note: signals.length ? undefined : "Couldn't look up registration date", signals };
+}
+
+// ------------------------------------------------------------------- ABN ---
+
+export async function abnCheck(x: Extracted): Promise<CheckResult> {
+  const base = { id: "abn", name: "ABN / business register" };
+  const guid = process.env.ABR_GUID;
+  if (!x.abns.length && !x.businessName)
+    return { ...base, status: "na", note: "No ABN or business name in the ad", signals: [] };
+  if (!guid) return { ...base, status: "skipped", note: "ABR_GUID not set", signals: [] };
+
+  const parseJsonp = (t: string) => JSON.parse(t.replace(/^[^(]*\(/, "").replace(/\);?\s*$/, ""));
+  const signals: Signal[] = [];
+  try {
+    for (const abn of x.abns.slice(0, 2)) {
+      const t = await (await fetch(`https://abr.business.gov.au/json/AbnDetails.aspx?abn=${abn}&guid=${guid}`)).text();
+      const d = parseJsonp(t);
+      const link = [{ title: "ABN Lookup record", url: `https://abr.business.gov.au/ABN/View?abn=${abn}` }];
+      if (!d.Abn) signals.push({ points: -15, label: `ABN ${abn} not found on the register`, links: link });
+      else if (d.AbnStatus !== "Active")
+        signals.push({ points: -15, label: `ABN ${abn} is ${d.AbnStatus} (${d.EntityName})`, links: link });
+      else signals.push({ points: 5, label: `ABN ${abn} is active: ${d.EntityName}`, detail: "Check this name matches the seller.", links: link });
+    }
+    if (!x.abns.length && x.businessName) {
+      const t = await (await fetch(`https://abr.business.gov.au/json/MatchingNames.aspx?name=${encodeURIComponent(x.businessName)}&maxResults=5&guid=${guid}`)).text();
+      const d = parseJsonp(t);
+      const names: any[] = d.Names || [];
+      const exact = names.find((n) => String(n.Name).toLowerCase() === x.businessName!.toLowerCase());
+      if (exact)
+        signals.push({ points: 3, label: `"${x.businessName}" is a registered business name`, links: [{ title: "ABN Lookup", url: `https://abr.business.gov.au/ABN/View?abn=${exact.Abn}` }] });
+      else
+        signals.push({ points: -4, label: `"${x.businessName}" isn't a registered business name`, detail: "Hobby breeders may not have one — ask for their breeder ID instead." });
+    }
+    return { ...base, status: "ran", signals };
+  } catch (e) {
+    return { ...base, status: "error", note: (e as Error).message, signals };
+  }
+}
