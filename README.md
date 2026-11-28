@@ -9,9 +9,9 @@ A website where people buying a pet on Gumtree paste the listing link (or the ad
 | Scam-language scan | Shipping/pet transport, gift cards/crypto, deposits before viewing, PayID-only, "relocating overseas", WhatsApp-only, AKC papers, crate/insurance fees, and more | nothing |
 | Breeder ID | Looks for a breeder/source/supply/microchip number. Flags its absence in VIC, NSW, QLD, SA, where ads must show one | nothing |
 | Price vs market | Flags prices far below typical AU prices for ~30 popular breeds (`lib/breeds.ts`) | nothing |
-| Reverse image search | Google Cloud Vision *Web Detection*: are the ad photos on other websites? | `GOOGLE_VISION_API_KEY` |
-| Text, name and phone search | Searches the web for a sentence from the ad (copy-paste scam templates), the phone numbers and emails (scam reports), and the seller/business name next to "scam/fraud" | `BRAVE_SEARCH_API_KEY` |
-| Facebook and Instagram | Web search restricted to facebook.com and instagram.com for the business name and phone. Returns links for the buyer to check | `BRAVE_SEARCH_API_KEY` |
+| Reverse image search | Google Lens through Serper.dev for ad photo links; Google Cloud Vision for uploaded photos: are the ad photos on other websites? | `SERPER_API_KEY`, optional `GOOGLE_VISION_API_KEY` |
+| Text, name and phone search | Searches the web for a sentence from the ad (copy-paste scam templates), the phone numbers and emails (scam reports), and the seller/business name next to "scam/fraud" | `SERPER_API_KEY` (Serper.dev) |
+| Facebook and Instagram | Web search restricted to facebook.com and instagram.com for the business name and phone. Returns links for the buyer to check | `SERPER_API_KEY` (Serper.dev) |
 | Website age | RDAP lookup on any website in the ad. Brand-new domains are flagged | nothing |
 | ABN | ABN Lookup: is the ABN active, and is the business name registered? | `ABR_GUID` (free) |
 
@@ -25,7 +25,7 @@ cp .env.example .env.local   # add whichever keys you have
 npm run dev                  # http://localhost:3000
 ```
 
-It deploys to Vercel as-is. Add the same environment variables in the project settings.
+Hosting: Replit. Import the repo, add the keys under Tools > Secrets, then Deploy (the `.replit` file sets the build and start commands). Host in an Australian region if offered, so the SA breeder register (which blocks non-Australian servers) can be added.
 
 ## Known limits (read before launch)
 

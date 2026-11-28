@@ -287,3 +287,9 @@ h1 .hl, h2 .hl { display: inline-block; line-height: 1.02; padding: 0.06em 0.14e
 }
 .area li.soon { background: transparent; border: 1px dashed var(--line-strong); color: var(--faint); }
 .area li.soon span { font-size: 0.75rem; margin-left: 4px; opacity: 0.85; }
+
+/* Live counter band under the hero: real completed checks only, starts at 0. */
+.counter { border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); background: linear-gradient(90deg, rgb(23 228 214 / 0.06), rgb(23 228 214 / 0.02) 60%, transparent); }
+.counter-in { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px 18px; padding-top: 26px; padding-bottom: 26px; }
+.counter-num { font-family: var(--font-display); font-weight: var(--display-weight); font-size: clamp(2.6rem, 5vw, 3.6rem); line-height: 1; color: var(--accent); font-variant-numeric: tabular-nums; }
+.counter-label { color: var(--muted); font-size: 1.05rem; }

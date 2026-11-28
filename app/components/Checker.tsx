@@ -68,7 +68,7 @@ const EXAMPLE_SIGNALS: Signal[] = [
 ];
 
 /** Which external services are configured on the server (no secrets, just yes/no). */
-export type Keys = { vision: boolean; brave: boolean; abr: boolean };
+export type Keys = { vision: boolean; serper: boolean; abr: boolean };
 type Item = string | { t: string; needs: keyof Keys };
 const label = (i: Item) => (typeof i === "string" ? i : i.t);
 const isOn = (i: Item, k: Keys) => typeof i === "string" || k[i.needs];
@@ -109,22 +109,22 @@ const AREAS: { icon: typeof Phone; title: string; body: string; items: Item[] }[
     icon: ClipboardText,
     title: "Copied ad wording",
     body: "Scam templates get pasted word for word across many ads.",
-    items: [{ t: "Ad text found on other pages", needs: "brave" }],
+    items: [{ t: "Ad text found on other pages", needs: "serper" }],
   },
   {
     icon: Phone,
     title: "Phone, email and seller name",
     body: "Searched against scam reports and warnings published online.",
     items: [
-      { t: "Phone in scam reports", needs: "brave" }, { t: "Email in scam reports", needs: "brave" },
-      { t: "Phone or email reused on other sites", needs: "brave" }, { t: "Name next to scam or fraud reports", needs: "brave" },
+      { t: "Phone in scam reports", needs: "serper" }, { t: "Email in scam reports", needs: "serper" },
+      { t: "Phone or email reused on other sites", needs: "serper" }, { t: "Name next to scam or fraud reports", needs: "serper" },
     ],
   },
   {
     icon: InstagramLogo,
     title: "Facebook and Instagram",
     body: "Links to the seller's pages so you can check their history and past litters.",
-    items: [{ t: "Social pages found", needs: "brave" }, { t: "No social presence for a named business", needs: "brave" }],
+    items: [{ t: "Social pages found", needs: "serper" }, { t: "No social presence for a named business", needs: "serper" }],
   },
   {
     icon: Buildings,
@@ -149,7 +149,9 @@ const RULES = [
   { icon: Megaphone, title: "Report it fast", body: "Tell Scamwatch and Gumtree, and call your bank straight away if you've paid." },
 ];
 
-export default function Checker({ keys }: { keys: Keys }) {
+export default function Checker({ keys, initialTotal }: { keys: Keys; initialTotal: number | null }) {
+  // Running total of real checks (null when the counter store can't be reached).
+  const [total, setTotal] = useState<number | null>(initialTotal);
   // Only count checks that actually run on this server today.
   const CHECK_COUNT = AREAS.reduce((n, a) => n + a.items.filter((i) => isOn(i, keys)).length, 0);
   const pending = AREAS.reduce((n, a) => n + a.items.filter((i) => !isOn(i, keys)).length, 0);
@@ -219,6 +221,7 @@ export default function Checker({ keys }: { keys: Keys }) {
       }
       if (!res.ok) throw new Error(data.error || "The check didn't finish. Please try again.");
       setReport(data);
+      if (typeof data.total === "number") setTotal(data.total);
     } catch (e) {
       setError((e as Error).message || "The check didn't finish. Please try again.");
     } finally {
@@ -398,6 +401,17 @@ export default function Checker({ keys }: { keys: Keys }) {
             </div>
           </div>
         </section>
+
+        {total !== null && (
+          <section className="counter" aria-label="Ads checked so far">
+            <div className="wrap counter-in">
+              <span className="counter-num" aria-live="polite">{total.toLocaleString("en-AU")}</span>
+              <span className="counter-label">
+                {total === 1 ? "pet ad checked" : "pet ads checked"} by Australian buyers so far
+              </span>
+            </div>
+          </section>
+        )}
 
         {showResults && (
           <section id="results" className="section" style={{ paddingTop: 24, scrollMarginTop: 80 }}>

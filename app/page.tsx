@@ -1,13 +1,15 @@
 import Checker, { type Keys } from "./components/Checker";
+import { getCheckCount } from "../lib/counter";
 
-// Read at request time so the page's check count always matches what the server can run.
+// Read at request time so the check count and the running total are always current.
 export const dynamic = "force-dynamic";
 
-export default function Page() {
+export default async function Page() {
   const keys: Keys = {
-    vision: Boolean(process.env.GOOGLE_VISION_API_KEY),
-    brave: Boolean(process.env.BRAVE_SEARCH_API_KEY),
+    vision: Boolean(process.env.GOOGLE_VISION_API_KEY || process.env.SERPER_API_KEY),
+    serper: Boolean(process.env.SERPER_API_KEY),
     abr: Boolean(process.env.ABR_GUID),
   };
-  return <Checker keys={keys} />;
+  const total = await getCheckCount();
+  return <Checker keys={keys} initialTotal={total} />;
 }

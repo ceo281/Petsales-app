@@ -16,8 +16,11 @@ const SCAM_WORDS = /\b(scam|scammer|scammed|fraud|fake|ripped off|beware|warning
 export async function imageCheck(l: Listing): Promise<CheckResult> {
   const base = { id: "images", name: "Reverse image search" };
   const key = process.env.GOOGLE_VISION_API_KEY;
-  if (!key) return { ...base, status: "skipped", note: "GOOGLE_VISION_API_KEY not set", signals: [] };
   if (!l.images.length) return { ...base, status: "skipped", note: "No photos supplied", signals: [] };
+  if (!key) {
+    if (process.env.SERPER_API_KEY) return lensImageCheck(l);
+    return { ...base, status: "skipped", note: "Photo search not switched on yet", signals: [] };
+  }
 
   const images = l.images.slice(0, 4);
   const requests = images.map((src) => ({
@@ -26,9 +29,10 @@ export async function imageCheck(l: Listing): Promise<CheckResult> {
   }));
 
   try {
-    const res = await fetch(`https://vision.googleapis.com/v1/images:annotate?key=${key}`, {
+    // Key goes in a header (not the URL) so it never lands in logs or proxies' URL records.
+    const res = await fetch("https://vision.googleapis.com/v1/images:annotate", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", "x-goog-api-key": key },
       body: JSON.stringify({ requests }),
       signal: AbortSignal.timeout(20000),
     });
@@ -67,25 +71,72 @@ export async function imageCheck(l: Listing): Promise<CheckResult> {
 
 // ------------------------------------------------------------ web search ---
 
-type BraveResult = { title: string; url: string; description?: string };
+type SearchResult = { title: string; url: string; description?: string };
 
-async function brave(q: string): Promise<BraveResult[]> {
-  const key = process.env.BRAVE_SEARCH_API_KEY!;
-  const u = new URL("https://api.search.brave.com/res/v1/web/search");
-  u.searchParams.set("q", q);
-  u.searchParams.set("count", "10");
-  u.searchParams.set("country", "AU");
-  const res = await fetch(u, {
-    headers: { accept: "application/json", "X-Subscription-Token": key },
+/** Google web search via Serper.dev (https://serper.dev), Australian results. */
+async function search(q: string): Promise<SearchResult[]> {
+  const key = process.env.SERPER_API_KEY!;
+  const res = await fetch("https://google.serper.dev/search", {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-api-key": key },
+    body: JSON.stringify({ q, gl: "au", hl: "en", num: 10 }),
     signal: AbortSignal.timeout(10000),
   });
-  if (!res.ok) throw new Error(`Brave Search HTTP ${res.status}`);
+  if (!res.ok) throw new Error(`Serper search HTTP ${res.status}`);
   const data = await res.json();
-  return (data.web?.results || []).map((r: any) => ({
-    title: String(r.title || "").replace(/<[^>]+>/g, ""),
-    url: r.url,
-    description: String(r.description || "").replace(/<[^>]+>/g, ""),
+  return (data.organic || []).map((r: any) => ({
+    title: String(r.title || ""),
+    url: String(r.link || ""),
+    description: String(r.snippet || ""),
   }));
+}
+
+/**
+ * Google Lens via Serper.dev: where else does this photo appear?
+ * Only works for photos with a public https URL (not uploaded files).
+ * The response field names are read defensively; confirm against a live key.
+ */
+async function lens(imageUrl: string): Promise<SearchResult[]> {
+  const key = process.env.SERPER_API_KEY!;
+  const res = await fetch("https://google.serper.dev/lens", {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-api-key": key },
+    body: JSON.stringify({ url: imageUrl, gl: "au", hl: "en" }),
+    signal: AbortSignal.timeout(20000),
+  });
+  if (!res.ok) throw new Error(`Serper Lens HTTP ${res.status}`);
+  const data = await res.json();
+  const rows: any[] = [...(data.organic || []), ...(data.visualMatches || []), ...(data.visual_matches || []), ...(data.images || [])];
+  return rows
+    .map((r) => ({ title: String(r.title || r.source || ""), url: String(r.link || r.url || ""), description: String(r.snippet || "") }))
+    .filter((r) => r.url.startsWith("http"));
+}
+
+/** Reverse image search through Serper's Google Lens, used when Vision isn't configured. */
+async function lensImageCheck(l: Listing): Promise<CheckResult> {
+  const base = { id: "images", name: "Reverse image search" };
+  const urls = l.images.filter((s) => s.startsWith("https://")).slice(0, 4);
+  if (!urls.length)
+    return { ...base, status: "skipped", note: "Photo search needs the ad's photo links (use the bookmark or a Gumtree link)", signals: [] };
+  const signals: Signal[] = [];
+  const results = await Promise.allSettled(urls.map(lens));
+  results.forEach((r, i) => {
+    if (r.status !== "fulfilled") return;
+    const elsewhere = r.value.filter((p) => !LISTING_HOSTS.test(p.url));
+    const sites = new Set(elsewhere.map((p) => host(p.url)));
+    const links = elsewhere.slice(0, 6).map((p) => ({ title: p.title || host(p.url), url: p.url }));
+    if (sites.size >= 1)
+      signals.push({
+        points: sites.size >= 3 ? -30 : -22,
+        label: `Photo ${i + 1} appears on ${sites.size} other website${sites.size > 1 ? "s" : ""}`,
+        detail: "Scammers usually steal photos from real breeders. Check whether these pages belong to the same seller.",
+        links,
+      });
+  });
+  if (results.every((r) => r.status === "rejected"))
+    return { ...base, status: "error", note: String((results[0] as PromiseRejectedResult).reason?.message || "Photo search failed"), signals };
+  if (!signals.length) signals.push({ points: 6, label: "No copies of the photos found elsewhere online" });
+  return { ...base, status: "ran", signals };
 }
 
 /** Pick a distinctive sentence from the description to detect copy-paste ads. */
@@ -100,8 +151,8 @@ function fingerprintSentence(desc: string) {
 
 export async function webCheck(l: Listing, x: Extracted): Promise<CheckResult> {
   const base = { id: "web", name: "Online text, name & phone search" };
-  if (!process.env.BRAVE_SEARCH_API_KEY)
-    return { ...base, status: "skipped", note: "BRAVE_SEARCH_API_KEY not set", signals: [] };
+  if (!process.env.SERPER_API_KEY)
+    return { ...base, status: "skipped", note: "Web search not switched on yet", signals: [] };
 
   const signals: Signal[] = [];
   const jobs: Promise<void>[] = [];
@@ -109,7 +160,7 @@ export async function webCheck(l: Listing, x: Extracted): Promise<CheckResult> {
   const sentence = fingerprintSentence(l.description || l.rawText);
   if (sentence) {
     jobs.push(
-      brave(`"${sentence}"`).then((rs) => {
+      search(`"${sentence}"`).then((rs) => {
         const other = rs.filter((r) => !LISTING_HOSTS.test(r.url) && (!l.url || !r.url.startsWith(l.url)));
         if (other.length >= 2)
           signals.push({
@@ -127,7 +178,7 @@ export async function webCheck(l: Listing, x: Extracted): Promise<CheckResult> {
   const identifiers = [...x.phones, ...x.emails].slice(0, 4);
   for (const id of identifiers) {
     jobs.push(
-      brave(`"${id}"`).then((rs) => {
+      search(`"${id}"`).then((rs) => {
         const scammy = rs.filter((r) => SCAM_WORDS.test(`${r.title} ${r.description}`));
         if (scammy.length)
           signals.push({
@@ -150,7 +201,7 @@ export async function webCheck(l: Listing, x: Extracted): Promise<CheckResult> {
   const name = x.businessName || l.sellerName;
   if (name && name.length >= 4) {
     jobs.push(
-      brave(`"${name}" (scam OR fraud OR fake OR "ripped off")`).then((rs) => {
+      search(`"${name}" (scam OR fraud OR fake OR "ripped off")`).then((rs) => {
         const scammy = rs.filter((r) => SCAM_WORDS.test(`${r.title} ${r.description}`) && r.title.toLowerCase().includes(name.toLowerCase().split(" ")[0]));
         if (scammy.length)
           signals.push({
@@ -179,12 +230,12 @@ export async function socialCheck(l: Listing, x: Extracted): Promise<CheckResult
   const base = { id: "social", name: "Facebook & Instagram presence" };
   const terms = [x.businessName, ...x.phones.slice(0, 1)].filter(Boolean) as string[];
   if (!terms.length) return { ...base, status: "na", note: "No business name or phone to look up", signals: [] };
-  if (!process.env.BRAVE_SEARCH_API_KEY)
-    return { ...base, status: "skipped", note: "BRAVE_SEARCH_API_KEY not set", signals: [] };
+  if (!process.env.SERPER_API_KEY)
+    return { ...base, status: "skipped", note: "Web search not switched on yet", signals: [] };
 
   try {
     const q = terms.map((t) => `"${t}"`).join(" OR ");
-    const [fb, ig] = await Promise.all([brave(`${q} site:facebook.com`), brave(`${q} site:instagram.com`)]);
+    const [fb, ig] = await Promise.all([search(`${q} site:facebook.com`), search(`${q} site:instagram.com`)]);
     const links = [...fb, ...ig].slice(0, 8).map((r) => ({ title: r.title || host(r.url), url: r.url }));
     const signals: Signal[] = [];
     if (links.length)

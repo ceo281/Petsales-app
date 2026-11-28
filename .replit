@@ -1,0 +1,11 @@
+run = "npm run dev"
+modules = ["nodejs-22"]
+
+[deployment]
+build = ["npm", "run", "build"]
+run = ["npm", "run", "start"]
+deploymentTarget = "cloudrun"
+
+[[ports]]
+localPort = 3000
+externalPort = 80

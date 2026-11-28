@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { BlockedError, fetchListing, isGumtreeUrl, parseListingHtml } from "../../../lib/fetchListing";
 import { parsePrice } from "../../../lib/extract";
 import { runChecks } from "../../../lib/score";
+import { recordCheck } from "../../../lib/counter";
 import type { Listing } from "../../../lib/types";
 
 export const runtime = "nodejs";
@@ -68,7 +69,10 @@ export async function POST(req: Request) {
   if (!listing.title && !listing.description && !listing.rawText && !listing.images.length)
     return NextResponse.json({ error: "We couldn't find any listing details to check." }, { status: 422 });
 
-  return NextResponse.json(await runChecks(listing));
+  const report = await runChecks(listing);
+  // Count only checks that produced a report; blocked or empty requests above don't count.
+  const total = await recordCheck();
+  return NextResponse.json({ ...report, total });
 }
 
 function cleanImages(list: string[]) {
