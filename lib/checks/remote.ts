@@ -199,7 +199,14 @@ export async function webCheck(l: Listing, x: Extracted): Promise<CheckResult> {
   for (const id of identifiers) {
     jobs.push(
       search(`"${id}"`).then((rs) => {
-        const scammy = rs.filter((r) => SCAM_WORDS.test(`${r.title} ${r.description}`));
+        // Search is fuzzy: keep only pages that actually contain this exact phone or email.
+        const isPhone = /^\d+$/.test(id);
+        const needle = isPhone ? id.slice(1) : id.toLowerCase(); // drop leading 0 to match +61 forms
+        const exact = rs.filter((r) => {
+          const hay = `${r.title} ${r.description} ${r.url}`;
+          return isPhone ? hay.replace(/\D/g, "").includes(needle) : hay.toLowerCase().includes(needle);
+        });
+        const scammy = exact.filter((r) => SCAM_WORDS.test(`${r.title} ${r.description}`));
         if (scammy.length)
           signals.push({
             points: -30,
@@ -207,12 +214,12 @@ export async function webCheck(l: Listing, x: Extracted): Promise<CheckResult> {
             detail: "Read these pages yourself. The match may be coincidental, but treat it seriously.",
             links: scammy.slice(0, 5).map((r) => ({ title: r.title, url: r.url })),
           });
-        else if (rs.filter((r) => !LISTING_HOSTS.test(r.url)).length >= 3)
+        else if (exact.filter((r) => !LISTING_HOSTS.test(r.url)).length >= 3)
           signals.push({
             points: 0,
             label: `${id} is used on other sites`,
             detail: "Check these are the same seller and breed.",
-            links: rs.slice(0, 5).map((r) => ({ title: r.title, url: r.url })),
+            links: exact.slice(0, 5).map((r) => ({ title: r.title, url: r.url })),
           });
       })
     );
