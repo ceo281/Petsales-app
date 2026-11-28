@@ -413,6 +413,20 @@ export default function Checker({ keys, initialTotal }: { keys: Keys; initialTot
           </section>
         )}
 
+        <section className="banner" aria-label="PetSales Scam Check">
+          <div className="wrap">
+            <div className="banner-frame">
+              <img
+                src="/scam-check-hero.webp"
+                alt="Neon PetSales.com.au Scam Check sign glowing above a backlit keyboard"
+                width={2000}
+                height={1125}
+                loading="lazy"
+              />
+            </div>
+          </div>
+        </section>
+
         {showResults && (
           <section id="results" className="section" style={{ paddingTop: 24, scrollMarginTop: 80 }}>
             <div className="wrap" style={{ maxWidth: 880 }}>

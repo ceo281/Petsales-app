@@ -12,7 +12,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "PetSales Scam Checker",
     description: "Check a Gumtree pet ad for scam warning signs before you pay.",
-    images: ["/dog.jpg"],
+    images: [{ url: "/og.jpg", width: 1200, height: 675, alt: "PetSales.com.au Scam Check" }],
     locale: "en_AU",
     type: "website",
   },
