@@ -1,5 +1,6 @@
 import "./globals.css";
 import type { Metadata } from "next";
+import WeatherWidget from "./components/WeatherWidget";
 
 export const metadata: Metadata = {
   title: "PetSales Scam Checker",
@@ -9,7 +10,10 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en-AU">
-      <body>{children}</body>
+      <body>
+        {children}
+        <WeatherWidget />
+      </body>
     </html>
   );
 }
