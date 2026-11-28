@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ArrowRight,
   BookmarkSimple,
+  CheckCircle,
   Buildings,
   ChatCenteredText,
   CircleNotch,
@@ -98,9 +99,33 @@ export default function Home() {
   const [blocked, setBlocked] = useState(false);
   const [report, setReport] = useState<Report | null>(null);
   const [origin, setOrigin] = useState("");
+  const [shared, setShared] = useState(false);
 
   useEffect(() => {
     setOrigin(window.location.origin);
+    if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
+
+    // Arrived from the phone's Share menu (Web Share Target). Android puts the
+    // link in `url` or inside `text`; the title comes through as `title`.
+    const q = new URLSearchParams(window.location.search);
+    if (q.has("url") || q.has("text") || q.has("title")) {
+      const raw = `${q.get("url") || ""} ${q.get("text") || ""}`;
+      const link = raw.match(/https?:\/\/[^\s]*gumtree\.com\.au[^\s]*/i)?.[0];
+      // Gumtree titles look like "Cavoodle puppies | Dogs & Puppies | Gumtree Australia".
+      const title = (q.get("title") || "").split(" | ")[0].replace(/\s*-\s*Gumtree.*$/i, "").trim();
+      history.replaceState(null, "", window.location.pathname);
+      if (link) {
+        setUrl(link);
+        setShared(true);
+        setMode("manual");
+        if (title) setManual((m) => ({ ...m, title }));
+        requestAnimationFrame(() => document.getElementById("d")?.focus());
+      } else {
+        setError("That share didn't include a Gumtree link. Open the ad in Gumtree and share it again.");
+      }
+      return;
+    }
+
     const m = window.location.hash.match(/^#d=(.+)$/);
     if (!m) return;
     try {
@@ -187,6 +212,14 @@ export default function Home() {
               </p>
 
               <div className="checker">
+                {shared && mode === "manual" && (
+                  <div className="shared-note" role="status">
+                    <CheckCircle size={20} weight="fill" aria-hidden="true" />
+                    <span>
+                      <strong>Got the ad link.</strong> Gumtree doesn&apos;t let us read the ad for you, so copy the description from the ad and paste it below. Add the photos too if you can.
+                    </span>
+                  </div>
+                )}
                 {mode === "url" ? (
                   <form onSubmit={submitUrl} noValidate>
                     <div className="field">

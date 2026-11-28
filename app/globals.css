@@ -132,6 +132,8 @@ h1 .hl { color: var(--accent); }
 .notice ol { margin: 0; padding-left: 20px; color: var(--text); }
 .notice li { margin: 8px 0; }
 .bm { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; margin: 0 4px; border-radius: 999px; background: var(--accent); color: var(--accent-ink); font-weight: 700; text-decoration: none; cursor: grab; }
+.shared-note { display: flex; gap: 10px; align-items: flex-start; margin-bottom: 18px; padding: 14px 16px; border-radius: var(--r-ctl); background: var(--accent-soft); border: 1px solid var(--line-strong); color: var(--text); font-size: 0.95rem; }
+.shared-note svg { color: var(--accent); flex: none; margin-top: 2px; }
 .alert { margin-top: 16px; display: flex; gap: 10px; align-items: flex-start; color: var(--danger); background: var(--danger-soft); border-radius: var(--r-ctl); padding: 12px 14px; }
 
 /* --------------------------------------------------------------- report */
