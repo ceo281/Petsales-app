@@ -264,7 +264,7 @@ export default function Home() {
           <div className="wrap hero-grid">
             <div>
               <h1>
-                Scam check <span className="hl">that pet.</span>
+                Scam check.<br /> <span className="hl">Check that pet.</span>
               </h1>
               <p className="lede">
                 Paste the Gumtree link before you pay a cent. We run {CHECK_COUNT} checks and score the ad out of 100.
