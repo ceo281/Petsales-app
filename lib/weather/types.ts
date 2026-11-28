@@ -26,6 +26,8 @@ export type WeatherPayload = {
   today: DayForecast | null;
   next: DayForecast[];
   tip: { tone: "ok" | "warn" | "danger"; text: string };
+  /** Walk verdict for right now, shown on the card. */
+  walk: { level: "go" | "caution" | "no"; label: string; detail: string };
   modelUpdatedAt: string | null;
   fetchedAt: string;
   via: "gps" | "search" | "ip";

@@ -137,10 +137,43 @@ export function shape(
     today,
     next: days.slice(1, 5),
     tip: petTip(round(d.apparent_air_temperature ?? d.air_temperature), today),
+    walk: walkVerdict({
+      feels: round(d.apparent_air_temperature ?? d.air_temperature),
+      label: nowDesc.label,
+      icon: nowDesc.icon,
+      night: nowDesc.night,
+      windKmh: typeof d.wind_speed === "number" ? Math.round(d.wind_speed * 3.6) : null,
+      hour: Number(hourOf.format(new Date())),
+      today,
+    }),
     modelUpdatedAt: updatedAt,
     fetchedAt: new Date().toISOString(),
     via,
   };
+}
+
+/** Walk now? Judged on conditions right now and the local time. Most serious first. */
+function walkVerdict(n: {
+  feels: number | null; label: string; icon: IconKind; night: boolean; windKmh: number | null; hour: number; today: DayForecast | null;
+}): WeatherPayload["walk"] {
+  const f = n.feels;
+  if (f !== null && f >= 32)
+    return { level: "no", label: "Too hot to walk", detail: "Hot footpaths burn paws. Wait until it cools down." };
+  if (n.icon === "storm")
+    return { level: "no", label: "Stay inside", detail: "Storms around. Keep pets in and gates shut." };
+  if (n.label === "Heavy rain" || n.label === "Heavy showers" || (n.windKmh !== null && n.windKmh >= 55))
+    return { level: "no", label: "Stay inside", detail: n.label.startsWith("Heavy") ? "Heavy rain right now." : "Very windy right now." };
+  if (f !== null && f >= 27 && !n.night)
+    return { level: "caution", label: "Walk early or late", detail: `${f}° now. Check the footpath with your hand first.` };
+  const fineNow = n.icon === "sun" || n.icon === "partly-day";
+  if (fineNow && n.hour >= 11 && n.hour < 15 && (n.today?.uvMax ?? 0) >= 8)
+    return { level: "caution", label: "Walk early or late", detail: "Very high UV until mid-afternoon. Stick to the shade." };
+  if (n.icon === "rain" || n.icon === "showers")
+    return { level: "caution", label: "Short walk only", detail: "Wet out. Bring a towel for paws." };
+  if (f !== null && f <= 5)
+    return { level: "caution", label: "Short walk only", detail: `${f}° out. A coat helps small and short-haired dogs.` };
+  if (n.night) return { level: "go", label: "Fine for a walk", detail: "Dark out, so take a light and a lead." };
+  return { level: "go", label: "Great for a walk", detail: "Comfortable conditions right now." };
 }
 
 /** One line of pet-care advice for the conditions. Most serious first. */

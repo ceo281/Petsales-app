@@ -50,7 +50,22 @@ The weather widget is **not** part of the scam checker. It's built for a differe
 
 Options on the tag: `data-position="left"` (float bottom-left), `data-start="mini"` (start as the small chip). Preview: `/weather-demo.html`.
 
-It renders inside a Shadow DOM, so the host site's CSS can't break it. It floats bottom-right: a smoky cloud with a glossy cyan card showing the temperature, TODAY, the date, the condition and the place. The card and cloud colours change with the weather (sunny, cloudy, rain, storm, night, hot). Tapping the card opens today's details, a 4-day outlook and a pet-care tip. It refreshes every 10 minutes and can be minimised to a chip.
+It renders inside a Shadow DOM, so the host site's CSS can't break it.
+
+**Scenes:** each condition has its own artwork: sunny, partly cloudy, cloudy, showers (sun + cloud + light rain), rain, storm (dark cloud, rain, lightning flash), too hot (big orange sun), clear night (moon and stars) and cloudy night. The card colour changes with it. Animation is off for visitors who set "reduce motion".
+
+**Walk verdict:** a pill under the card says whether to walk *right now*, from the current feels-like temperature, rain, storms, wind, UV and time of day (`walkVerdict` in `lib/weather/metno.ts`):
+
+| Verdict | When |
+|---|---|
+| Too hot to walk | feels-like 32° or more |
+| Stay inside | storms, heavy rain, or wind 55 km/h+ |
+| Walk early or late | feels-like 27–31° in daylight, or very high UV between 11am and 3pm on a fine day |
+| Short walk only | rain or showers, or feels-like 5° or less |
+| Fine for a walk | night, otherwise fine (take a light) |
+| Great for a walk | everything else |
+
+These thresholds are sensible starting points, not veterinary rules. Breed, age and health matter (flat-faced breeds overheat sooner), so get a vet to sanity-check them before launch. It floats bottom-right: a smoky cloud with a glossy cyan card showing the temperature, TODAY, the date, the condition and the place. The card and cloud colours change with the weather (sunny, cloudy, rain, storm, night, hot). Tapping the card opens today's details, a 4-day outlook and a pet-care tip. It refreshes every 10 minutes and can be minimised to a chip.
 
 **Location:** first the visitor's approximate IP location (Vercel geo headers, no prompt). Visitors can then use "Use my location" (GPS, rounded to ~1 km) or type a postcode/suburb, and the choice is remembered in their browser.
 
