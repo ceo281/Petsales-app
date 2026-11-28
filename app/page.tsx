@@ -69,21 +69,80 @@ const EXAMPLE_SIGNALS: Signal[] = [
   { points: -20, label: "Offers pet transport instead of pick-up" },
 ];
 
-const CHECKS = [
-  { icon: ChatCenteredText, title: "Scam wording", body: "Shipping offers, deposits before viewing, PayID-only, sob stories and surprise crate or insurance fees." },
-  { icon: ClipboardText, title: "Copy-paste ads", body: "We search the web for the ad's wording. Scam templates get reused word for word." },
-  { icon: Phone, title: "Phone, email and name", body: "Matched against scam reports and warnings published online." },
-  { icon: InstagramLogo, title: "Facebook and Instagram", body: "Links to the seller's social pages, so you can check their history." },
-  { icon: IdentificationCard, title: "Breeder ID", body: "VIC, NSW, QLD and SA ads must show one by law. We check it's there." },
-  { icon: CurrencyDollar, title: "Price vs market", body: "Too cheap for the breed is the number one scam lure." },
-  { icon: Buildings, title: "Website and ABN", body: "Brand-new websites and cancelled ABNs are flagged." },
+// Every item here maps to a rule in lib/checks. Keep this list in step with the code.
+const AREAS: { icon: typeof Phone; title: string; body: string; items: string[]; key?: boolean }[] = [
+  {
+    icon: ChatCenteredText,
+    title: "Scam wording",
+    body: "The scripts scammers reuse, and the signs of a genuine breeder.",
+    items: [
+      "Shipping or pet transport", "Gift cards, crypto, Western Union", "Deposit before viewing", "Bank transfer or PayID up front",
+      "Seller can't meet", "Relocation or sob story", "WhatsApp or text only", "US kennel club papers", "Urgency pressure",
+      "'Free' pet lure", "'Teacup' marketing", "Crate, insurance or quarantine fees",
+      "Invites you to visit", "Breed club membership", "Health testing",
+    ],
+  },
+  {
+    icon: IdentificationCard,
+    title: "Breeder and microchip numbers",
+    body: "Required by law in VIC, NSW, QLD and SA ads. We look the number up for you where the state allows it.",
+    items: ["Number shown in the ad", "Missing where the law requires it", "Looked up on the VIC register", "Looked up on the QLD register", "NSW number format", "Microchip number"],
+  },
+  {
+    icon: CurrencyDollar,
+    title: "Price against the market",
+    body: "Too cheap for the breed is the most common lure. Compared with typical Australian prices for about 30 breeds.",
+    items: ["Not a real price", "Far below market", "Well below market", "Plausible price"],
+  },
+  {
+    icon: Images,
+    title: "Stolen photos",
+    body: "Reverse image search on up to four photos from the ad.",
+    items: ["Same photo on other websites", "Edited or cropped copies"],
+    key: true,
+  },
+  {
+    icon: ClipboardText,
+    title: "Copied ad wording",
+    body: "Scam templates get pasted word for word across many ads.",
+    items: ["Ad text found on other pages"],
+    key: true,
+  },
+  {
+    icon: Phone,
+    title: "Phone, email and seller name",
+    body: "Searched against scam reports and warnings published online.",
+    items: ["Phone in scam reports", "Email in scam reports", "Phone or email reused on other sites", "Name next to scam or fraud reports"],
+    key: true,
+  },
+  {
+    icon: InstagramLogo,
+    title: "Facebook and Instagram",
+    body: "Links to the seller's pages so you can check their history and past litters.",
+    items: ["Social pages found", "No social presence for a named business"],
+    key: true,
+  },
+  {
+    icon: Buildings,
+    title: "Website and ABN",
+    body: "Fake breeder websites are usually weeks old. ABNs are checked against the government register.",
+    items: ["Website age", "ABN number valid", "ABN active or cancelled", "Business name registered"],
+  },
+];
+const CHECK_COUNT = AREAS.reduce((n, a) => n + a.items.length, 0);
+
+const REGISTERS = [
+  { state: "VIC", name: "Pet Exchange Register", status: "Checked live", live: true, note: "We search the source number and show the result in your report." },
+  { state: "QLD", name: "Dog Breeder Register", status: "Checked live", live: true, note: "We search the supply number and show the result in your report." },
+  { state: "SA", name: "Dogs and Cats Online", status: "Coming soon", live: false, note: "The register only answers Australian servers. Live once we move to Sydney hosting." },
+  { state: "NSW", name: "NSW Pet Registry", status: "Format check", live: false, note: "NSW requires a CAPTCHA on every search, so we check the number's format and link you to the registry." },
 ];
 
 const RULES = [
   { icon: Eye, title: "See the pet in person", body: "Or a live video call where the seller says your name and shows the pet with its mum." },
   { icon: HandCoins, title: "No deposits to strangers", body: "Never pay by bank transfer, PayID, gift card or crypto before you've met. Banks never charge you to receive a PayID payment." },
   { icon: Truck, title: "No shipping, no fees", body: "Pet transport, crate, insurance or quarantine fees are how the scam escalates." },
-  { icon: IdentificationCard, title: "Verify the numbers", body: "Look up the breeder ID on your state register and check the microchip is in the seller's name." },
+  { icon: IdentificationCard, title: "Verify the numbers", body: "We check VIC and QLD numbers for you. Elsewhere, look the number up and check the microchip is in the seller's name." },
   { icon: Megaphone, title: "Report it fast", body: "Tell Scamwatch and Gumtree, and call your bank straight away if you've paid." },
 ];
 
@@ -208,7 +267,7 @@ export default function Home() {
                 Check the pet ad <span className="hl">before you pay.</span>
               </h1>
               <p className="lede">
-                Paste a Gumtree link. We check the photos, wording, price, seller and breeder ID, then score it out of 100.
+                Paste a Gumtree link. We run {CHECK_COUNT} scam checks and score the ad out of 100.
               </p>
 
               <div className="checker">
@@ -322,7 +381,12 @@ export default function Home() {
                 </div>
                 <div className="panel">
                   <h3>Warning signs</h3>
-                  {EXAMPLE_SIGNALS.map((s, i) => <SignalRow key={i} s={s} />)}
+                  <div className="scan-bar" aria-hidden="true" />
+                  {EXAMPLE_SIGNALS.map((s, i) => (
+                    <div key={i} className="scan-row" style={{ "--i": i } as React.CSSProperties}>
+                      <SignalRow s={s} />
+                    </div>
+                  ))}
                 </div>
               </div>
               <p className="preview-cap">Example report for a typical scam ad.</p>
@@ -369,25 +433,53 @@ export default function Home() {
           </section>
         )}
 
-        <section id="how" className="section section-deep">
-          <div className="wrap">
-            <h2 className="title">Eight checks on every ad.</h2>
-            <p className="section-lede">
-              Each check looks for a pattern we see again and again in pet scams. Every warning links to its source so you can judge it yourself.
-            </p>
-            <div className="bento">
-              <article className="cell cell-feature">
-                <img src="/dog.jpg" alt="A black dog licking its nose against a navy background" loading="lazy" />
-                <div className="cell-ico"><Images size={22} aria-hidden="true" /></div>
-                <h3>Reverse image search</h3>
-                <p>Most scam ads use photos stolen from real breeders. We look for the same photos anywhere else online.</p>
-              </article>
-              {CHECKS.map((c, i) => (
-                <article key={c.title} className={`cell${i === 0 ? " cell-wide" : ""}`}>
-                  <div className="cell-ico"><c.icon size={22} aria-hidden="true" /></div>
-                  <h3>{c.title}</h3>
-                  <p>{c.body}</p>
-                </article>
+        <section id="how" className="section">
+          <div className="wrap checks-grid">
+            <div className="checks-intro">
+              <h2 className="title">
+                <span className="hl">{CHECK_COUNT} checks</span> on every ad.
+              </h2>
+              <p className="section-lede">
+                Each one looks for a pattern that turns up again and again in Australian pet scams. Every warning in your report links to its source, so you can judge it yourself.
+              </p>
+              <div className="photo">
+                <img src="/dog.jpg" alt="A black dog licking its nose" loading="lazy" width={606} height={468} />
+              </div>
+            </div>
+            <ul className="areas">
+              {AREAS.map((a) => (
+                <li key={a.title} className="area">
+                  <div className="area-ico"><a.icon size={22} aria-hidden="true" /></div>
+                  <div>
+                    <h3>
+                      {a.title} <span className="count">{a.items.length}</span>
+                    </h3>
+                    <p>{a.body}</p>
+                    <ul aria-label={`${a.title} checks`}>
+                      {a.items.map((it) => <li key={it}>{it}</li>)}
+                    </ul>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </section>
+
+        <section className="registers" aria-labelledby="reg-title">
+          <div className="wrap" style={{ paddingTop: 72, paddingBottom: 56 }}>
+            <h2 className="title" id="reg-title">We look up the breeder number for you.</h2>
+            <p className="section-lede">Breeder numbers are required by law in four states. Where a state lets us, we search its register and put the answer in your report.</p>
+            <div className="reg-grid">
+              {REGISTERS.map((r) => (
+                <div key={r.state} className="reg">
+                  <div className="reg-state">{r.state}</div>
+                  <div className="reg-name">{r.name}</div>
+                  <span className={`reg-status${r.live ? " live" : ""}`}>
+                    {r.live ? <CheckCircle size={14} weight="fill" aria-hidden="true" /> : null}
+                    {r.status}
+                  </span>
+                  <p className="reg-note">{r.note}</p>
+                </div>
               ))}
             </div>
           </div>
@@ -410,7 +502,7 @@ export default function Home() {
             <ol className="rule-list">
               {RULES.map((r) => (
                 <li key={r.title} className="rule">
-                  <div className="rule-ico"><r.icon size={22} aria-hidden="true" /></div>
+                  <div className="rule-ico"><r.icon size={40} weight="duotone" aria-hidden="true" /></div>
                   <div>
                     <strong>{r.title}</strong>
                     <span>{r.body}</span>
@@ -423,6 +515,9 @@ export default function Home() {
       </main>
 
       <footer className="footer">
+        <div className="wrap footer-band" aria-hidden="true">
+          <img className="sticker" src="/stickers/animals.png" alt="" width={880} height={276} loading="lazy" />
+        </div>
         <div className="wrap footer-in">
           <img src="/logo@720.png" alt="PetSales.com.au" width={120} height={52} style={{ width: 120, height: "auto" }} loading="lazy" />
           <p>

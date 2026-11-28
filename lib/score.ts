@@ -2,6 +2,7 @@ import type { CheckResult, Extracted, Listing, Report } from "./types";
 import { extract } from "./extract";
 import { breederIdCheck, priceCheck, textCheck } from "./checks/local";
 import { abnCheck, domainCheck, imageCheck, socialCheck, webCheck } from "./checks/remote";
+import { lookupBreederNumber } from "./registers";
 
 /**
  * Score = 100 is lowest risk. We start from a neutral 70 rather than 100 so a
@@ -14,9 +15,11 @@ const WEIGHT: Record<string, number> = { images: 2, web: 2, text: 1, breeder: 1,
 
 export async function runChecks(listing: Listing): Promise<Report> {
   const x: Extracted = extract(listing);
+  const breeder = breederIdCheck(listing, x);
+  await addRegisterLookup(breeder, x);
   const checks: CheckResult[] = [
     textCheck(listing),
-    breederIdCheck(listing, x),
+    breeder,
     priceCheck(listing, x),
     ...(await Promise.all([imageCheck(listing), webCheck(listing, x), socialCheck(listing, x), domainCheck(x), abnCheck(x)])),
   ];
@@ -50,6 +53,25 @@ export async function runChecks(listing: Listing): Promise<Report> {
     checks,
     manualLinks: manualLinks(listing, x),
   };
+}
+
+/** Look the breeder number up on the state register where that is allowed (VIC, QLD). */
+async function addRegisterLookup(check: CheckResult, x: Extracted) {
+  const shown = check.signals.find((s) => s.copy && !/^Microchip/.test(s.label));
+  if (!shown?.copy || (x.state !== "VIC" && x.state !== "QLD")) return;
+  const register = x.state === "VIC" ? "Victorian Pet Exchange Register" : "Queensland Dog Breeder Register";
+  const r = await lookupBreederNumber(x.state, shown.copy);
+  if (r.status === "found") {
+    shown.points = 8;
+    shown.label = `${shown.copy} is on the ${register}`;
+    shown.detail = `${r.detail ? `${r.detail} ` : ""}The number is real, but scammers copy real breeders' numbers. Ask the seller for ID and make sure their name matches the registered breeder.`;
+  } else if (r.status === "notfound") {
+    shown.points = -25;
+    shown.label = `${shown.copy} is not on the ${register}`;
+    shown.detail = "We searched the official register and this number doesn't exist. Don't pay until the seller gives you a number that checks out.";
+  } else {
+    shown.detail = `We couldn't reach the ${register} just now (${r.reason}). ${shown.detail}`;
+  }
 }
 
 function manualLinks(l: Listing, x: Extracted) {
