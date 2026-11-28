@@ -7,7 +7,6 @@ import {
   CheckCircle,
   Buildings,
   ChatCenteredText,
-  CircleNotch,
   ClipboardText,
   CurrencyDollar,
   Eye,
@@ -16,7 +15,6 @@ import {
   Images,
   InstagramLogo,
   LinkSimple,
-  LockSimple,
   Phone,
   Truck,
   UploadSimple,
@@ -252,7 +250,7 @@ export default function Home() {
       <header className="nav">
         <div className="wrap nav-in">
           <a className="brand" href="/" aria-label="PetSales Scam Checker home">
-            <img src="/logo@720.png" alt="PetSales.com.au" width={150} height={65} style={{ width: 150, height: "auto", borderRadius: 0 }} />
+            <img src="/logo@720.png" alt="PetSales.com.au" width={156} height={68} style={{ width: 156, height: "auto", borderRadius: 0 }} />
             <span className="brand-sub">Scam Checker</span>
           </a>
           <a className="nav-link" href="#how">How it works</a>
@@ -290,13 +288,13 @@ export default function Home() {
                           value={url} onChange={(e) => setUrl(e.target.value)}
                           aria-invalid={!!urlError} aria-describedby={urlError ? "url-err" : "url-help"}
                         />
-                        <button className="btn btn-primary" disabled={loading}>
-                          {loading ? <CircleNotch className="spin" size={20} aria-hidden="true" /> : <LinkSimple size={20} weight="bold" aria-hidden="true" />}
+                        <button className="btn btn-primary" disabled={loading} aria-busy={loading}>
+                          {loading ? <span className="btn-dots" aria-hidden="true"><i /><i /><i /></span> : <LinkSimple size={20} weight="bold" aria-hidden="true" />}
                           {loading ? "Checking" : "Check listing"}
                         </button>
                       </div>
                       {urlError ? (
-                        <p className="field-err" id="url-err" role="alert">{urlError}</p>
+                        <p className="field-err" id="url-err" role="alert"><WarningCircle size={16} weight="fill" aria-hidden="true" />{urlError}</p>
                       ) : (
                         <p className="help" id="url-help">Copy it from the address bar while you&apos;re looking at the ad.</p>
                       )}
@@ -316,7 +314,7 @@ export default function Home() {
                         aria-invalid={!!descError} aria-describedby={descError ? "d-err" : "d-help"}
                       />
                       {descError ? (
-                        <p className="field-err" id="d-err" role="alert">{descError}</p>
+                        <p className="field-err" id="d-err" role="alert"><WarningCircle size={16} weight="fill" aria-hidden="true" />{descError}</p>
                       ) : (
                         <p className="help" id="d-help">Copy everything the seller wrote, including phone numbers.</p>
                       )}
@@ -357,8 +355,8 @@ export default function Home() {
                       )}
                     </div>
                     <div>
-                      <button className="btn btn-primary" disabled={loading}>
-                        {loading ? <CircleNotch className="spin" size={20} aria-hidden="true" /> : <ArrowRight size={20} weight="bold" aria-hidden="true" />}
+                      <button className="btn btn-primary" disabled={loading} aria-busy={loading}>
+                        {loading ? <span className="btn-dots" aria-hidden="true"><i /><i /><i /></span> : <ArrowRight size={20} weight="bold" aria-hidden="true" />}
                         {loading ? "Checking" : "Check listing"}
                       </button>
                     </div>
@@ -369,7 +367,6 @@ export default function Home() {
                   <button type="button" className="linkbtn" onClick={() => { setMode(mode === "url" ? "manual" : "url"); setBlocked(false); }}>
                     {mode === "url" ? <><ClipboardText size={18} aria-hidden="true" /> No link? Paste the ad text instead</> : <><LinkSimple size={18} aria-hidden="true" /> Use a Gumtree link instead</>}
                   </button>
-                  <span className="privacy"><LockSimple size={15} aria-hidden="true" /> Free. No sign-up.</span>
                 </div>
               </div>
             </div>
@@ -486,30 +483,31 @@ export default function Home() {
         </section>
 
         <section className="section">
-          <div className="wrap rules">
-            <div>
+          <div className="wrap">
+            <div className="rules-head">
               <h2 className="title">Five rules before you pay anyone.</h2>
-              <p className="section-lede">A good score is never a reason to skip these. Scammers can write a clean-looking ad.</p>
-              <div className="report-cta">
-                <a className="btn btn-primary" href="#main">
-                  <LinkSimple size={20} weight="bold" aria-hidden="true" /> Check listing
-                </a>
-                <a className="btn btn-ghost" href="https://www.scamwatch.gov.au/report-a-scam" target="_blank" rel="noreferrer">
-                  Report a scam
-                </a>
-              </div>
+              <p className="section-lede" style={{ marginBottom: 0 }}>A good score is never a reason to skip these. Scammers can write a clean-looking ad.</p>
             </div>
-            <ol className="rule-list">
-              {RULES.map((r) => (
-                <li key={r.title} className="rule">
-                  <div className="rule-ico"><r.icon size={40} weight="duotone" aria-hidden="true" /></div>
+            <ol className="rule-grid">
+              {RULES.map((r, i) => (
+                <li key={r.title} className={`rule${i === 0 ? " rule-feature" : ""}`}>
                   <div>
-                    <strong>{r.title}</strong>
+                    <div className="rule-ico"><r.icon size={i === 0 ? 48 : 34} weight="duotone" aria-hidden="true" /></div>
+                    <strong style={{ marginTop: 12 }}>{r.title}</strong>
                     <span>{r.body}</span>
                   </div>
+                  {i === 0 && <img className="sticker" src="/stickers/rabbit-cat.png" alt="" aria-hidden="true" width={266} height={205} loading="lazy" />}
                 </li>
               ))}
             </ol>
+            <div className="report-cta">
+              <a className="btn btn-primary" href="#main">
+                <LinkSimple size={20} weight="bold" aria-hidden="true" /> Check listing
+              </a>
+              <a className="btn btn-ghost" href="https://www.scamwatch.gov.au/report-a-scam" target="_blank" rel="noreferrer">
+                Report a scam
+              </a>
+            </div>
           </div>
         </section>
       </main>
