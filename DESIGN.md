@@ -13,11 +13,10 @@ colors:
   line: "rgba(23,228,214,0.16)"
   line-strong: "rgba(23,228,214,0.32)"
 typography:
-  display: { family: "Archivo", weight: 800, tracking: "-0.025em", use: "h1, section titles, register state codes, rule titles" }
-  ui: { family: "Rubik", weights: [400, 500, 600, 700], use: "all body, labels, buttons" }
-  mono: { family: "Geist Mono", use: "scores, points, breeder numbers only" }
-  h1: "clamp(2.4rem, 5vw, 4rem) / 1.04"
-  title: "clamp(1.9rem, 3.4vw, 2.75rem) / 1.06"
+  display: { family: "Anton", weight: 400, tracking: "0.005em", use: "h1, section titles, risk band, score number, register state codes, rule titles", note: "Brand font chosen by the owner. Single weight; never synthesize bold." }
+  ui: { family: "Poppins", weights: [400, 500, 600, 700], use: "all other text: body, labels, buttons, numbers (tabular figures)", note: "Brand font chosen by the owner." }
+  h1: "clamp(3rem, 6.4vw, 5.25rem) / 1.12; keyword chip set inline-block so it never overlaps the line above"
+  title: "clamp(2.25rem, 4.2vw, 3.4rem) / 1.14"
   body: "16px / 1.6; marketing lede 18px / 1.75"
   button: "14px / 700 / uppercase / 0.06em"
 rounded: { chip: 4px, input: 6px, button: 8px, panel: 12px, image: 18px, status-pill: 9999px }

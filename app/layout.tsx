@@ -1,10 +1,10 @@
 import "./globals.css";
 import type { Metadata, Viewport } from "next";
-import { Archivo, Geist_Mono, Rubik } from "next/font/google";
+import { Anton, Poppins } from "next/font/google";
 
-const rubik = Rubik({ subsets: ["latin"], variable: "--font-rubik", display: "swap" });
-const archivo = Archivo({ subsets: ["latin"], weight: ["800"], variable: "--font-archivo", display: "swap" });
-const geistMono = Geist_Mono({ subsets: ["latin"], variable: "--font-geist-mono", display: "swap" });
+// Brand fonts: Anton for headings, Poppins for everything else.
+const anton = Anton({ subsets: ["latin"], weight: "400", variable: "--font-anton", display: "swap" });
+const poppins = Poppins({ subsets: ["latin"], weight: ["400", "500", "600", "700"], variable: "--font-poppins", display: "swap" });
 
 export const metadata: Metadata = {
   title: "PetSales Scam Checker",
@@ -22,7 +22,7 @@ export const viewport: Viewport = { themeColor: "#12053b" };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en-AU" className={`${rubik.variable} ${archivo.variable} ${geistMono.variable}`}>
+    <html lang="en-AU" className={`${anton.variable} ${poppins.variable}`}>
       <body>{children}</body>
     </html>
   );
