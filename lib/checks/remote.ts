@@ -1,4 +1,5 @@
 import type { CheckResult, Extracted, Listing, Signal } from "../types";
+import { dHash, hamming, SAME_PHOTO_MAX_DISTANCE } from "../imageHash";
 
 const LISTING_HOSTS = /gumtree\.com\.au|ebayimg|classistatic/;
 const host = (u: string) => {
@@ -94,9 +95,12 @@ async function search(q: string): Promise<SearchResult[]> {
 /**
  * Google Lens via Serper.dev: where else does this photo appear?
  * Only works for photos with a public https URL (not uploaded files).
- * The response field names are read defensively; confirm against a live key.
+ * Verified response shape: { organic: [{ title, source, link, imageUrl, thumbnailUrl }] }.
+ * Lens returns visually SIMILAR images, so every match is confirmed as the same
+ * photo with a perceptual hash before it counts (see lensImageCheck).
  */
-async function lens(imageUrl: string): Promise<SearchResult[]> {
+type LensResult = SearchResult & { thumb?: string };
+async function lens(imageUrl: string): Promise<LensResult[]> {
   const key = process.env.SERPER_API_KEY!;
   const res = await fetch("https://google.serper.dev/lens", {
     method: "POST",
@@ -108,7 +112,12 @@ async function lens(imageUrl: string): Promise<SearchResult[]> {
   const data = await res.json();
   const rows: any[] = [...(data.organic || []), ...(data.visualMatches || []), ...(data.visual_matches || []), ...(data.images || [])];
   return rows
-    .map((r) => ({ title: String(r.title || r.source || ""), url: String(r.link || r.url || ""), description: String(r.snippet || "") }))
+    .map((r) => ({
+      title: String(r.title || r.source || ""),
+      url: String(r.link || r.url || ""),
+      description: String(r.snippet || ""),
+      thumb: String(r.thumbnailUrl || r.imageUrl || ""),
+    }))
     .filter((r) => r.url.startsWith("http"));
 }
 
@@ -120,19 +129,30 @@ async function lensImageCheck(l: Listing): Promise<CheckResult> {
     return { ...base, status: "skipped", note: "Photo search needs the ad's photo links (use the bookmark or a Gumtree link)", signals: [] };
   const signals: Signal[] = [];
   const results = await Promise.allSettled(urls.map(lens));
-  results.forEach((r, i) => {
-    if (r.status !== "fulfilled") return;
-    const elsewhere = r.value.filter((p) => !LISTING_HOSTS.test(p.url));
-    const sites = new Set(elsewhere.map((p) => host(p.url)));
-    const links = elsewhere.slice(0, 6).map((p) => ({ title: p.title || host(p.url), url: p.url }));
-    if (sites.size >= 1)
-      signals.push({
-        points: sites.size >= 3 ? -30 : -22,
-        label: `Photo ${i + 1} appears on ${sites.size} other website${sites.size > 1 ? "s" : ""}`,
-        detail: "Scammers usually steal photos from real breeders. Check whether these pages belong to the same seller.",
-        links,
-      });
-  });
+  await Promise.all(
+    results.map(async (r, i) => {
+      if (r.status !== "fulfilled") return;
+      const original = await dHash(urls[i]);
+      if (original === null) return;
+      // Confirm each candidate is the SAME photo, not just a similar-looking pet.
+      const candidates = r.value.filter((p) => !LISTING_HOSTS.test(p.url) && p.thumb).slice(0, 15);
+      const checked = await Promise.all(
+        candidates.map(async (p) => {
+          const h = await dHash(p.thumb!);
+          return h !== null && hamming(original, h) <= SAME_PHOTO_MAX_DISTANCE ? p : null;
+        })
+      );
+      const copies = checked.filter((p): p is LensResult => p !== null);
+      const sites = new Set(copies.map((p) => host(p.url)));
+      if (sites.size >= 1)
+        signals.push({
+          points: sites.size >= 3 ? -30 : -22,
+          label: `Photo ${i + 1} appears on ${sites.size} other website${sites.size > 1 ? "s" : ""}`,
+          detail: "The same photo is on these pages. Scammers usually steal photos from real breeders, so check whether these pages belong to the same seller.",
+          links: copies.slice(0, 6).map((p) => ({ title: p.title || host(p.url), url: p.url })),
+        });
+    })
+  );
   if (results.every((r) => r.status === "rejected"))
     return { ...base, status: "error", note: String((results[0] as PromiseRejectedResult).reason?.message || "Photo search failed"), signals };
   if (!signals.length) signals.push({ points: 6, label: "No copies of the photos found elsewhere online" });
@@ -236,7 +256,11 @@ export async function socialCheck(l: Listing, x: Extracted): Promise<CheckResult
   try {
     const q = terms.map((t) => `"${t}"`).join(" OR ");
     const [fb, ig] = await Promise.all([search(`${q} site:facebook.com`), search(`${q} site:instagram.com`)]);
-    const links = [...fb, ...ig].slice(0, 8).map((r) => ({ title: r.title || host(r.url), url: r.url }));
+    // Keep only direct Facebook / Instagram links (search can return Google redirect URLs).
+    const links = [...fb, ...ig]
+      .filter((r) => /(^|\.)(facebook|instagram)\.com$/.test(host(r.url)))
+      .slice(0, 8)
+      .map((r) => ({ title: r.title || host(r.url), url: r.url }));
     const signals: Signal[] = [];
     if (links.length)
       signals.push({
