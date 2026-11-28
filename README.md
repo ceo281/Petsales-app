@@ -38,26 +38,38 @@ It deploys to Vercel as-is. Add the same environment variables in the project se
 - **Breed prices** in `lib/breeds.ts` are rough. Replace them with PetSales market data.
 - **State breeder-ID rules** change. Confirm the current VIC/NSW/QLD/SA/WA/TAS rules and register links in `lib/checks/local.ts`.
 
-## Weather widget
+## Weather widget (for the other PetSales site)
 
-A floating weather card (bottom-right on every page) showing local conditions, today's min/max, a 4-day outlook and a pet-care tip (heat, storms, UV, cold, rain). The card colour changes with the conditions. It refreshes every 10 minutes while the tab is visible, catches up when the tab is reopened, and can be minimised to a small chip.
+The weather widget is **not** part of the scam checker. It's built for a different PetSales website and lives here because both are PetSales. This app only serves it: the script, the `/api/weather` endpoint, the fonts and the cloud artwork.
 
-**Location:** first the visitor's approximate location from Vercel's IP geo headers (no permission prompt). They can tap "Use my location" (browser GPS, rounded to ~1 km) or type a postcode/suburb. The choice is remembered in their browser. Running locally there are no IP headers, so it asks for a location.
+**Add it to any website** (WordPress, Shopify, Wix, custom) by pasting one line before `</body>`:
 
-**Data sources and licences**
+```html
+<script src="https://YOUR-VERCEL-DEPLOYMENT/weather-widget.js" defer></script>
+```
 
-| What | Source | Licence / cost |
+Options on the tag: `data-position="left"` (float bottom-left), `data-start="mini"` (start as the small chip). Preview: `/weather-demo.html`.
+
+It renders inside a Shadow DOM, so the host site's CSS can't break it. It floats bottom-right: a smoky cloud with a glossy cyan card showing the temperature, TODAY, the date, the condition and the place. The card and cloud colours change with the weather (sunny, cloudy, rain, storm, night, hot). Tapping the card opens today's details, a 4-day outlook and a pet-care tip. It refreshes every 10 minutes and can be minimised to a chip.
+
+**Location:** first the visitor's approximate IP location (Vercel geo headers, no prompt). Visitors can then use "Use my location" (GPS, rounded to ~1 km) or type a postcode/suburb, and the choice is remembered in their browser.
+
+**Sources and licences**
+
+| What | Source | Licence |
 |---|---|---|
-| Forecast + current conditions | [MET Norway Locationforecast](https://api.met.no/doc/TermsOfService) | Free, commercial use allowed, CC BY 4.0. Attribution shown in the widget |
-| Place names, postcode search | [OpenStreetMap Nominatim](https://operations.osmfoundation.org/policies/nominatim/) | Free, ODbL. Max 1 req/s, so results are cached 30 days |
+| Forecast | [MET Norway Locationforecast](https://api.met.no/doc/TermsOfService) | CC BY 4.0, free incl. commercial |
+| Place names / postcodes | [OpenStreetMap Nominatim](https://operations.osmfoundation.org/policies/nominatim/) | ODbL. Max 1 req/s, cached 30 days |
+| Cloud artwork (`public/weather-cloud.webp`) | [Photo by Thomas Bresson](https://commons.wikimedia.org/wiki/File:2013-05-25_19-49-39-nuages.jpg), sky keyed out, cropped and tinted | CC BY 3.0. The credit is shown in the widget's detail panel. Keep it |
+| Fonts (`public/fonts/`) | Oswald, Open Sans | SIL Open Font License, self-hosted |
 
-**Why not BOM:** BOM's free feeds (anonymous FTP and the web JSON products) are "not for commercial use", and `api.weather.bom.gov.au` says in every response "You must not use, copy or share it". Commercial access to live BOM data needs a paid [Registered User Services](https://www.bom.gov.au/resources/data-services) subscription. If PetSales buys one, add `lib/weather/bom.ts` returning the same `WeatherPayload` and swap it in `app/api/weather/route.ts`.
+**Why not BOM:** BOM's free feeds are "not for commercial use", and its API says "You must not use, copy or share it". Commercial use needs a paid [Registered User Services](https://www.bom.gov.au/resources/data-services) subscription. If PetSales buys one, add `lib/weather/bom.ts` returning the same `WeatherPayload`.
 
 **Before launch:**
-- Set `WEATHER_USER_AGENT` to something with a contact URL/email. Both MET Norway and Nominatim block anonymous traffic.
-- Nominatim's public server is for light use. If the GPS/postcode lookups get busy, switch to a paid geocoder or a bundled AU postcode list.
-- MET Norway is a model forecast (ECMWF-based). It isn't BOM's official forecast and has **no Australian warnings** (storms, fire danger). Don't present it as official warnings.
-- UV is MET's clear-sky value, which overstates on cloudy days. The widget labels it as clear-sky and only shows a UV tip on fine days.
+- Set `WEATHER_USER_AGENT` (with a contact URL/email). MET Norway and Nominatim block anonymous traffic.
+- Optionally set `WEATHER_ALLOWED_ORIGIN` to the other site's origin (default `*`).
+- MET is a model forecast, not BOM's official forecast, and has **no Australian warnings**. Don't label it "BOM" or "official".
+- UV is MET's clear-sky value, so it's labelled that way, and the UV tip only shows on fine days.
 
 ## Legal note: defamation
 
@@ -74,6 +86,6 @@ lib/checks/local.ts     language, breeder ID, price checks
 lib/checks/remote.ts    image, web, social, domain, ABN checks
 lib/score.ts            scoring, confidence, manual-check links
 app/api/weather/route.ts  API: weather for ?lat&lon | ?q=postcode | IP location
-app/components/Weather*   floating widget + icons
+public/weather-widget.js  embeddable floating widget (vanilla JS, Shadow DOM)
 lib/weather/            MET Norway forecast shaping, geocoding, pet tips
 ```
