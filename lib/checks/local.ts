@@ -14,11 +14,11 @@ const RED_FLAGS: { re: RegExp; points: number; label: string }[] = [
   { re: /\b(no (viewings?|inspections?|visits?)|can'?t (meet|view)|not available to view|working (overseas|offshore)|on (a )?mission|deployed|fifo)\b/i, points: -15, label: "Seller can't meet in person" },
   { re: /\b(relocat(ing|ion)|moving overseas|passed away|my late|deceased|lost my (job|husband|wife))\b/i, points: -8, label: "Sob-story / relocation reason (common scam script)" },
   { re: /\b(whatsapp|text only|email only|sms only|don'?t call|no calls|contact (me )?(via|on) (email|whatsapp))\b/i, points: -8, label: "Pushes contact off-platform / text-only" },
-  { re: /\b(akc|ckc|american kennel club)\b/i, points: -6, label: "Mentions US kennel clubs (AKC/CKC) — unusual for Aussie breeders" },
+  { re: /\b(akc|ckc|american kennel club)\b/i, points: -6, label: "Mentions US kennel clubs (AKC/CKC), unusual for Aussie breeders" },
   { re: /\b(urgent(ly)?|first come first serve|today only|must go (today|asap)|won'?t last)\b/i, points: -5, label: "Urgency pressure" },
-  { re: /\b(free to (a )?good home|free puppy|free kitten)\b/i, points: -8, label: "'Free' pet — often a lure for transport/vet 'fees'" },
+  { re: /\b(free to (a )?good home|free puppy|free kitten)\b/i, points: -8, label: "'Free' pet, often a lure for transport or vet 'fees'" },
   { re: /\b(teacup|micro ?mini|pocket size)\b/i, points: -4, label: "'Teacup' marketing (welfare + scam red flag)" },
-  { re: /\b(insurance fee|crate fee|transport fee|vaccination fee|customs|quarantine fee)\b/i, points: -20, label: "Mentions extra fees (crate/insurance/quarantine) — classic scam escalation" },
+  { re: /\b(insurance fee|crate fee|transport fee|vaccination fee|customs|quarantine fee)\b/i, points: -20, label: "Mentions extra fees (crate, insurance, quarantine): a classic scam escalation" },
 ];
 
 const GREEN_FLAGS: { re: RegExp; points: number; label: string }[] = [
@@ -67,7 +67,7 @@ export function breederIdCheck(l: Listing, x: Extracted): CheckResult {
     signals.push({
       points: 6,
       label: "Breeder / source / microchip number is shown",
-      detail: `Found "${idMatch[0].trim()}". A number alone proves nothing — look it up on the official register and check the name matches.`,
+      detail: `Found "${idMatch[0].trim()}". A number alone proves nothing. Look it up on the official register and check the name matches.`,
       links: req?.lookup ? [{ title: `Verify on the ${x.state} register`, url: req.lookup }] : undefined,
     });
   } else if (req && isDogOrCat) {
@@ -90,7 +90,7 @@ export function priceCheck(l: Listing, x: Extracted): CheckResult {
   if (l.price === undefined)
     return { id: "price", name: "Price vs market", status: "skipped", note: "No price found", signals };
 
-  const range = `typical AU range ~$${breed.low.toLocaleString()}–$${breed.high.toLocaleString()}`;
+  const range = `typical AU range ~$${breed.low.toLocaleString()} to $${breed.high.toLocaleString()}`;
   if (l.price <= 50) signals.push({ points: -15, label: `$${l.price} for a ${x.breed} is not a real price`, detail: range });
   else if (l.price < breed.low * 0.4)
     signals.push({ points: -25, label: `Price far below market for a ${x.breed} ($${l.price})`, detail: `${range}. Too-good-to-be-true pricing is the #1 pet-scam lure.` });

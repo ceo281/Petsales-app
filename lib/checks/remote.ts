@@ -133,7 +133,7 @@ export async function webCheck(l: Listing, x: Extracted): Promise<CheckResult> {
           signals.push({
             points: -30,
             label: `${id} appears in online scam reports/warnings`,
-            detail: "Read these pages yourself — the match may be coincidental, but treat it seriously.",
+            detail: "Read these pages yourself. The match may be coincidental, but treat it seriously.",
             links: scammy.slice(0, 5).map((r) => ({ title: r.title, url: r.url })),
           });
         else if (rs.filter((r) => !LISTING_HOSTS.test(r.url)).length >= 3)
@@ -260,7 +260,7 @@ export async function abnCheck(x: Extracted): Promise<CheckResult> {
       if (exact)
         signals.push({ points: 3, label: `"${x.businessName}" is a registered business name`, links: [{ title: "ABN Lookup", url: `https://abr.business.gov.au/ABN/View?abn=${exact.Abn}` }] });
       else
-        signals.push({ points: -4, label: `"${x.businessName}" isn't a registered business name`, detail: "Hobby breeders may not have one — ask for their breeder ID instead." });
+        signals.push({ points: -4, label: `"${x.businessName}" isn't a registered business name`, detail: "Hobby breeders may not have one. Ask for their breeder ID instead." });
     }
     return { ...base, status: "ran", signals };
   } catch (e) {
