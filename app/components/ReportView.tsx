@@ -184,9 +184,16 @@ export function ReportView({ r }: { r: Report }) {
         </div>
       </div>
 
-      <p className="disclaimer">
-        This report shows warning signs, not proof. A low score isn&apos;t an accusation against the seller, and a high score isn&apos;t a guarantee. Always see the pet in person before paying.
-      </p>
+      <aside className="panel notice-panel" aria-labelledby="read-this">
+        <h3 id="read-this"><WarningOctagon size={22} weight="fill" aria-hidden="true" /> Read this before you act on this report</h3>
+        <ul>
+          <li><strong>Warning signs, not proof.</strong> This is an automated check of the ad. It can be wrong or incomplete, and it does not say anyone is a scammer.</li>
+          <li><strong>A low score is not an accusation.</strong> Genuine sellers can trigger warnings. Don&apos;t publish, share or use this report to accuse or contact a seller.</li>
+          <li><strong>A high score is not a guarantee.</strong> Scammers can write clean ads. Always see the pet in person and verify the seller before you pay anything.</li>
+          <li><strong>Information comes from other sources</strong> such as search engines and government registers, which may be out of date or inaccurate.</li>
+          <li><strong>General information only.</strong> Not legal, financial or veterinary advice. See our <a href="/terms" target="_blank" rel="noreferrer">Terms of use</a>.</li>
+        </ul>
+      </aside>
     </section>
   );
 }

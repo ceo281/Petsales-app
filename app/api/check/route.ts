@@ -14,6 +14,8 @@ type Body = {
   capture?: { url?: string; title?: string; description?: string; text?: string; images?: string[]; jsonld?: string };
   /** Manual entry fallback. */
   manual?: { title?: string; description?: string; price?: string; location?: string; sellerName?: string; images?: string[] };
+  /** The buyer ticked the acknowledgement (see /terms). Required for every check. */
+  ack?: boolean;
 };
 
 const MAX_IMAGES = 6;
@@ -26,6 +28,10 @@ export async function POST(req: Request) {
   } catch {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
+
+  // No check runs without the buyer's acknowledgement, whatever page or tool sent the request.
+  if (body.ack !== true)
+    return NextResponse.json({ error: "Please tick the acknowledgement box before running a check." }, { status: 400 });
 
   let listing: Listing;
   try {

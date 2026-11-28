@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowRight,
   BookmarkSimple,
@@ -167,6 +167,21 @@ export default function Checker({ keys, initialTotal }: { keys: Keys; initialTot
   const [report, setReport] = useState<Report | null>(null);
   const [origin, setOrigin] = useState("");
   const [shared, setShared] = useState(false);
+  // Required acknowledgement before any check runs (also enforced by the API).
+  const [ack, setAck] = useState(false);
+  const [ackError, setAckError] = useState("");
+  // An ad captured by the bookmark waits here until the buyer acknowledges.
+  const [pendingCapture, setPendingCapture] = useState<{ url?: string } | null>(null);
+  // Start the example report's scan only when it scrolls into view (IntersectionObserver, no scroll listeners).
+  const previewRef = useRef<HTMLDivElement>(null);
+  const [previewSeen, setPreviewSeen] = useState(false);
+  useEffect(() => {
+    const el = previewRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver(([e]) => { if (e.isIntersecting) { setPreviewSeen(true); io.disconnect(); } }, { threshold: 0.3 });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
 
   useEffect(() => {
     setOrigin(window.location.origin);
@@ -199,7 +214,8 @@ export default function Checker({ keys, initialTotal }: { keys: Keys; initialTot
       const capture = JSON.parse(decodeURIComponent(escape(atob(decodeURIComponent(m[1])))));
       history.replaceState(null, "", window.location.pathname);
       setUrl(capture.url || "");
-      void check({ capture });
+      setPendingCapture(capture);
+      requestAnimationFrame(() => document.getElementById("ack")?.focus());
     } catch {
       setError("We couldn't read the captured ad. Open the Gumtree ad and click the bookmark again.");
     }
@@ -213,7 +229,7 @@ export default function Checker({ keys, initialTotal }: { keys: Keys; initialTot
     setReport(null);
     requestAnimationFrame(() => document.getElementById("results")?.scrollIntoView({ behavior: "smooth", block: "start" }));
     try {
-      const res = await fetch("/api/check", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+      const res = await fetch("/api/check", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...body, ack: true }) });
       const data = await res.json().catch(() => ({}));
       if (data.blocked) {
         setBlocked(true);
@@ -229,11 +245,25 @@ export default function Checker({ keys, initialTotal }: { keys: Keys; initialTot
     }
   }
 
+  function needsAck() {
+    if (ack) return false;
+    setAckError("Tick the box to confirm you understand what this check is, then try again.");
+    document.getElementById("ack")?.focus();
+    return true;
+  }
+
   function submitUrl(e: React.FormEvent) {
     e.preventDefault();
+    if (pendingCapture) {
+      if (needsAck()) return;
+      void check({ capture: pendingCapture });
+      setPendingCapture(null);
+      return;
+    }
     if (!url.trim()) return setUrlError("Paste the link to the Gumtree ad.");
     if (!isGumtree(url)) return setUrlError("That doesn't look like a gumtree.com.au link. Copy it from your browser's address bar.");
     setUrlError("");
+    if (needsAck()) return;
     void check({ url: url.trim() });
   }
 
@@ -241,6 +271,7 @@ export default function Checker({ keys, initialTotal }: { keys: Keys; initialTot
     e.preventDefault();
     if (manual.description.trim().length < 40) return setDescError("Paste the full description from the ad. A sentence or two isn't enough to check.");
     setDescError("");
+    if (needsAck()) return;
     void check({ url: url.trim() || undefined, manual: { ...manual, images } });
   }
 
@@ -252,6 +283,33 @@ export default function Checker({ keys, initialTotal }: { keys: Keys; initialTot
   }
 
   const bm = useMemo(() => (origin ? bookmarkletCode(origin) : "#"), [origin]);
+
+  const ackBox = (
+    <div className={`ack${ackError ? " ack-invalid" : ""}`}>
+      <label className="ack-label" htmlFor="ack">
+        <input
+          id="ack" type="checkbox" checked={ack}
+          onChange={(e) => { setAck(e.target.checked); if (e.target.checked) setAckError(""); }}
+          aria-invalid={!!ackError} aria-describedby={ackError ? "ack-err" : undefined}
+        />
+        <span>
+          I understand this is an <strong>automated check for warning signs</strong>, not proof that a seller is a scammer
+          or genuine, and not advice. I&apos;ll check the pet and seller myself before paying, and I agree to the{" "}
+          <a href="/terms" target="_blank" rel="noreferrer">Terms of use</a>.
+        </span>
+      </label>
+      {ackError && (
+        <p className="field-err" id="ack-err" role="alert"><WarningCircle size={16} weight="fill" aria-hidden="true" />{ackError}</p>
+      )}
+    </div>
+  );
+
+  const checkButton = (Icon: typeof ArrowRight) => (
+    <button className="btn btn-primary" disabled={loading} aria-busy={loading}>
+      {loading ? <span className="btn-dots" aria-hidden="true"><i /><i /><i /></span> : <Icon size={20} weight="bold" aria-hidden="true" />}
+      {loading ? "Checking" : "Check listing"}
+    </button>
+  );
   const showResults = loading || report || blocked || error;
 
   return (
@@ -289,27 +347,29 @@ export default function Checker({ keys, initialTotal }: { keys: Keys; initialTot
                   </div>
                 )}
                 {mode === "url" ? (
-                  <form onSubmit={submitUrl} noValidate>
+                  <form onSubmit={submitUrl} noValidate className="stack">
+                    {pendingCapture && (
+                      <div className="shared-note" role="status">
+                        <CheckCircle size={20} weight="fill" aria-hidden="true" />
+                        <span><strong>Ad captured from Gumtree.</strong> Tick the box below, then press Check listing.</span>
+                      </div>
+                    )}
                     <div className="field">
                       <label className="label" htmlFor="url">Gumtree listing link</label>
-                      <div className="url-row">
-                        <input
-                          id="url" className="input" type="url" inputMode="url" autoComplete="off"
-                          placeholder="https://www.gumtree.com.au/s-ad/..."
-                          value={url} onChange={(e) => setUrl(e.target.value)}
-                          aria-invalid={!!urlError} aria-describedby={urlError ? "url-err" : "url-help"}
-                        />
-                        <button className="btn btn-primary" disabled={loading} aria-busy={loading}>
-                          {loading ? <span className="btn-dots" aria-hidden="true"><i /><i /><i /></span> : <LinkSimple size={20} weight="bold" aria-hidden="true" />}
-                          {loading ? "Checking" : "Check listing"}
-                        </button>
-                      </div>
+                      <input
+                        id="url" className="input" type="url" inputMode="url" autoComplete="off"
+                        placeholder="https://www.gumtree.com.au/s-ad/..."
+                        value={url} onChange={(e) => { setUrl(e.target.value); setPendingCapture(null); }}
+                        aria-invalid={!!urlError} aria-describedby={urlError ? "url-err" : "url-help"}
+                      />
                       {urlError ? (
                         <p className="field-err" id="url-err" role="alert"><WarningCircle size={16} weight="fill" aria-hidden="true" />{urlError}</p>
                       ) : (
                         <p className="help" id="url-help">Copy it from the address bar while you&apos;re looking at the ad.</p>
                       )}
                     </div>
+                    {ackBox}
+                    <div>{checkButton(LinkSimple)}</div>
                   </form>
                 ) : (
                   <form onSubmit={submitManual} noValidate className="stack">
@@ -365,12 +425,8 @@ export default function Checker({ keys, initialTotal }: { keys: Keys; initialTot
                         </div>
                       )}
                     </div>
-                    <div>
-                      <button className="btn btn-primary" disabled={loading} aria-busy={loading}>
-                        {loading ? <span className="btn-dots" aria-hidden="true"><i /><i /><i /></span> : <ArrowRight size={20} weight="bold" aria-hidden="true" />}
-                        {loading ? "Checking" : "Check listing"}
-                      </button>
-                    </div>
+                    {ackBox}
+                    <div>{checkButton(ArrowRight)}</div>
                   </form>
                 )}
 
@@ -382,22 +438,15 @@ export default function Checker({ keys, initialTotal }: { keys: Keys; initialTot
               </div>
             </div>
 
-            <div className="preview" aria-label="Example report">
-              <div className="report">
-                <div className="panel">
-                  <ScoreHeader r={EXAMPLE} compact />
-                </div>
-                <div className="panel">
-                  <h3>Warning signs</h3>
-                  <div className="scan-bar" aria-hidden="true" />
-                  {EXAMPLE_SIGNALS.map((s, i) => (
-                    <div key={i} className="scan-row" style={{ "--i": i } as React.CSSProperties}>
-                      <SignalRow s={s} />
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <p className="preview-cap">Example report for a typical scam ad.</p>
+            {/* Hero visual (A1 4.8): the owner's neon Scam Check artwork, shown whole. */}
+            <div className="hero-visual">
+              <img
+                src="/scam-check-hero.webp"
+                alt="Neon PetSales.com.au Scam Check sign glowing above a backlit keyboard"
+                width={2000}
+                height={1125}
+                fetchPriority="high"
+              />
             </div>
           </div>
         </section>
@@ -413,16 +462,26 @@ export default function Checker({ keys, initialTotal }: { keys: Keys; initialTot
           </section>
         )}
 
-        <section className="banner" aria-label="PetSales Scam Check">
-          <div className="wrap">
-            <div className="banner-frame">
-              <img
-                src="/scam-check-hero.webp"
-                alt="Neon PetSales.com.au Scam Check sign glowing above a backlit keyboard"
-                width={2000}
-                height={1125}
-                loading="lazy"
-              />
+        <section className="section example" aria-labelledby="example-title">
+          <div className="wrap example-in">
+            <h2 className="title" id="example-title">This is what you get back.</h2>
+            <p className="section-lede">A score out of 100, every warning sign we found, and the source behind each one.</p>
+            <div className="preview" ref={previewRef}>
+              <div className={`report${previewSeen ? " in-view" : ""}`}>
+                <div className="panel">
+                  <ScoreHeader r={EXAMPLE} compact />
+                </div>
+                <div className="panel">
+                  <h3>Warning signs</h3>
+                  <div className="scan-bar" aria-hidden="true" />
+                  {EXAMPLE_SIGNALS.map((s, i) => (
+                    <div key={i} className="scan-row" style={{ "--i": i } as React.CSSProperties}>
+                      <SignalRow s={s} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <p className="preview-cap">Example report for a typical scam ad. Not a real seller.</p>
             </div>
           </div>
         </section>
@@ -561,9 +620,17 @@ export default function Checker({ keys, initialTotal }: { keys: Keys; initialTot
         </div>
         <div className="wrap footer-in">
           <img src="/logo@720.png" alt="PetSales.com.au" width={120} height={52} style={{ width: 120, height: "auto" }} loading="lazy" />
-          <p>
-            PetSales Scam Checker looks for warning signs. It can&apos;t prove a seller is honest or that they&apos;re a scammer. A high score isn&apos;t a guarantee, and a low score isn&apos;t an accusation.
-          </p>
+          <div className="footer-text">
+            <p>
+              PetSales Scam Checker is an automated tool that looks for common warning signs in pet ads. It gives general
+              information only. It can&apos;t prove a seller is honest or that they&apos;re a scammer: a high score isn&apos;t a
+              guarantee, and a low score isn&apos;t an accusation. Always see the pet in person and verify the seller before paying.
+            </p>
+            <p className="footer-links">
+              <a href="/terms">Terms of use and disclaimer</a>
+              <a href="https://www.scamwatch.gov.au/report-a-scam" target="_blank" rel="noreferrer">Report a scam to Scamwatch</a>
+            </p>
+          </div>
         </div>
       </footer>
     </>
