@@ -438,7 +438,7 @@ export default function Checker({ keys, initialTotal }: { keys: Keys; initialTot
               </div>
             </div>
 
-            {/* Hero visual (A1 4.8): the owner's neon Scam Check artwork, shown whole. */}
+            {/* Hero backdrop: the owner's neon artwork, faded into the page (A2 hero paradigm). */}
             <div className="hero-visual">
               <img
                 src="/scam-check-hero.webp"
@@ -452,23 +452,21 @@ export default function Checker({ keys, initialTotal }: { keys: Keys; initialTot
         </section>
 
         {total !== null && (
-          <section className="counter" aria-label="Ads checked so far">
+          <section className="counter" aria-label={`${total} scam checks performed`}>
             <div className="wrap counter-in">
               {/* Soft-UI dial: bezel, recessed well lit teal, raised knob. Pulses once when the total goes up. */}
-              <div className="counter-stage">
+              <div className="counter-stage" style={{ ["--p" as string]: `${(total / nextMilestone(total)) * 360}deg` }}>
                 <div className="dial-bezel">
                   <div className="dial-well">
                     <div className={`dial-knob${bump ? " dial-bump" : ""}`} onAnimationEnd={() => setBump(false)}>
                       <span className={`dial-num${String(total).length > 4 ? " dial-num-sm" : ""}`} aria-live="polite">
                         {total.toLocaleString("en-AU")}
                       </span>
-                      <span className="dial-unit" aria-hidden="true">checks</span>
+                      <span className="dial-unit" aria-hidden="true">{total === 1 ? "scam check performed" : "scam checks performed"}</span>
                     </div>
                   </div>
                 </div>
-                <p className="counter-label">
-                  {total === 1 ? "pet ad checked" : "pet ads checked"} by Australian buyers so far
-                </p>
+                <p className="dial-next">Next milestone: <strong>{nextMilestone(total).toLocaleString("en-AU")}</strong></p>
               </div>
             </div>
           </section>
@@ -646,4 +644,10 @@ export default function Checker({ keys, initialTotal }: { keys: Keys; initialTot
       </footer>
     </>
   );
+}
+
+/** Next 1-2.5-5 milestone strictly above the count (10, 25, 50, 100, 250...). */
+function nextMilestone(n: number) {
+  for (let base = 10; ; base *= 10)
+    for (const m of [1, 2.5, 5]) if (base * m > n) return base * m;
 }
