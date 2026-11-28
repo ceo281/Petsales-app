@@ -12,6 +12,7 @@ import {
   SealCheck,
   WarningCircle,
   WarningOctagon,
+  Info,
 } from "@phosphor-icons/react";
 import type { Report, Signal } from "../../lib/types";
 
@@ -185,13 +186,13 @@ export function ReportView({ r }: { r: Report }) {
       </div>
 
       <aside className="panel notice-panel" aria-labelledby="read-this">
-        <h3 id="read-this"><WarningOctagon size={22} weight="fill" aria-hidden="true" /> Read this before you act on this report</h3>
+        <h3 id="read-this"><Info size={22} weight="fill" aria-hidden="true" /> Good to know before you decide</h3>
         <ul>
-          <li><strong>Warning signs, not proof.</strong> This is an automated check of the ad. It can be wrong or incomplete, and it does not say anyone is a scammer.</li>
-          <li><strong>A low score is not an accusation.</strong> Genuine sellers can trigger warnings. Don&apos;t publish, share or use this report to accuse or contact a seller.</li>
-          <li><strong>A high score is not a guarantee.</strong> Scammers can write clean ads. Always see the pet in person and verify the seller before you pay anything.</li>
-          <li><strong>Information comes from other sources</strong> such as search engines and government registers, which may be out of date or inaccurate.</li>
-          <li><strong>General information only.</strong> Not legal, financial or veterinary advice. See our <a href="/terms" target="_blank" rel="noreferrer">Terms of use</a>.</li>
+          <li><strong>It spots warning signs, it doesn&apos;t prove anything.</strong> It&apos;s automated and can get things wrong.</li>
+          <li><strong>Honest sellers trip warnings too.</strong> Please don&apos;t use this to call out or contact the seller.</li>
+          <li><strong>A good score isn&apos;t a guarantee.</strong> Always meet the pet and check the seller before you pay.</li>
+          <li><strong>Some results come from search engines and public registers,</strong> which can be out of date.</li>
+          <li><strong>General info only,</strong> not legal or financial advice. <a href="/terms" target="_blank" rel="noreferrer">Terms</a></li>
         </ul>
       </aside>
     </section>

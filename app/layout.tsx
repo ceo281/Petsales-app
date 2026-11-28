@@ -4,7 +4,7 @@ import { Anton, Poppins } from "next/font/google";
 
 // Brand fonts: Anton for headings, Poppins for everything else.
 const anton = Anton({ subsets: ["latin"], weight: "400", variable: "--font-anton", display: "swap" });
-const poppins = Poppins({ subsets: ["latin"], weight: ["400", "500", "600", "700"], variable: "--font-poppins", display: "swap" });
+const poppins = Poppins({ subsets: ["latin"], weight: ["300", "400", "500", "600", "700"], variable: "--font-poppins", display: "swap" });
 
 export const metadata: Metadata = {
   title: "PetSales Scam Checker",

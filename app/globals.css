@@ -289,11 +289,63 @@ h1 .hl, h2 .hl { display: inline-block; line-height: 1.02; padding: 0.06em 0.14e
 .area li.soon { background: transparent; border: 1px dashed var(--line-strong); color: var(--faint); }
 .area li.soon span { font-size: 0.75rem; margin-left: 4px; opacity: 0.85; }
 
-/* Live counter band under the hero: real completed checks only, starts at 0. */
-.counter { border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); background: linear-gradient(90deg, rgb(23 228 214 / 0.06), rgb(23 228 214 / 0.02) 60%, transparent); }
-.counter-in { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px 18px; padding-top: 26px; padding-bottom: 26px; }
-.counter-num { font-family: var(--font-display); font-weight: var(--display-weight); font-size: clamp(2.6rem, 5vw, 3.6rem); line-height: 1; color: var(--accent); font-variant-numeric: tabular-nums; }
-.counter-label { color: var(--muted); font-size: 1.05rem; }
+/* Live counter: real completed checks only, starts at 0.
+   Soft UI (neumorphism) needs the object and its ground to share one colour,
+   so the dial sits on its own raised indigo stage. Light falls from the top
+   left: highlight shadows are a lighter indigo, depth shadows a darker indigo
+   (tinted to the hue, never black). Teal is the backlight, by owner request. */
+.counter { padding: 72px 0 40px; }
+.counter-in { display: grid; justify-items: center; }
+.counter-stage {
+  --s: #1c0e52; --s-hi: #2d1b7a; --s-lo: #0b0230;
+  display: grid; justify-items: center; gap: 28px; text-align: center;
+  width: min(100%, 520px); padding: clamp(36px, 6vw, 56px) 24px clamp(28px, 4vw, 40px);
+  border-radius: 36px; background: var(--s);
+  box-shadow: -18px -18px 40px rgb(40 24 108 / 0.55), 22px 22px 48px rgb(5 1 20 / 0.9),
+    inset 0 1px 0 rgb(255 255 255 / 0.05);
+}
+/* 1. Raised bezel with tick marks */
+.dial-bezel {
+  position: relative; display: grid; place-items: center;
+  width: clamp(240px, 60vw, 320px); aspect-ratio: 1; border-radius: 50%;
+  background: linear-gradient(145deg, #22125f, #170947);
+  box-shadow: -12px -12px 26px var(--s-hi), 14px 14px 30px var(--s-lo);
+}
+.dial-bezel::before {
+  content: ""; position: absolute; inset: 5%; border-radius: 50%;
+  background: repeating-conic-gradient(from 0deg, rgb(255 255 255 / 0.22) 0deg 0.9deg, transparent 0.9deg 6deg);
+  -webkit-mask: radial-gradient(circle, transparent 64%, #000 64.5%, #000 70%, transparent 70.5%);
+          mask: radial-gradient(circle, transparent 64%, #000 64.5%, #000 70%, transparent 70.5%);
+}
+/* 2. Recessed well: the knob sits in it, and the teal light lives in its floor */
+.dial-well {
+  position: relative; display: grid; place-items: center;
+  width: 78%; aspect-ratio: 1; border-radius: 50%;
+  background: radial-gradient(circle, #0f0436 55%, #140843 100%);
+  box-shadow: inset 8px 8px 16px var(--s-lo), inset -6px -6px 14px rgb(45 27 122 / 0.7);
+}
+/* teal light ring, glowing out from under the knob onto the well floor */
+.dial-well::before {
+  content: ""; position: absolute; inset: 9%; border-radius: 50%;
+  background: radial-gradient(circle, rgb(23 228 214 / 0.9) 58%, rgb(23 228 214 / 0.35) 68%, transparent 76%);
+  filter: blur(6px); opacity: 0.85;
+}
+/* 3. Raised knob */
+.dial-knob {
+  position: relative; display: grid; place-items: center; align-content: center; gap: 4px;
+  width: 80%; aspect-ratio: 1; border-radius: 50%;
+  background: linear-gradient(145deg, #2b1a6c 0%, #1d0d52 55%, #160843 100%);
+  box-shadow: -6px -6px 14px rgb(56 36 140 / 0.55), 8px 10px 18px rgb(5 1 20 / 0.85),
+    inset 0 2px 1px rgb(255 255 255 / 0.12), inset 0 -2px 2px rgb(5 1 20 / 0.5);
+}
+.dial-num { font-family: var(--font-sans); font-weight: 300; font-size: clamp(2.8rem, 9vw, 3.8rem); line-height: 1; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; color: var(--text); }
+.dial-num-sm { font-size: clamp(2rem, 6vw, 2.6rem); }
+.dial-unit { font-size: 0.72rem; font-weight: 500; letter-spacing: 0.16em; text-transform: uppercase; color: var(--accent); }
+.counter-label { margin: 0; color: var(--muted); font-size: 1.02rem; max-width: 34ch; }
+.dial-bump { animation: dialBump 0.9s var(--ease-out); }
+.dial-well:has(.dial-bump)::before { animation: glowBump 0.9s var(--ease-out); }
+@keyframes dialBump { 0% { transform: scale(1); } 30% { transform: scale(1.04); } 100% { transform: scale(1); } }
+@keyframes glowBump { 0% { opacity: 0.85; } 30% { opacity: 1; filter: blur(9px); } 100% { opacity: 0.85; } }
 
 /* Hero visual: the owner's neon Scam Check artwork, shown whole (it carries its own text). */
 .hero-visual { border-radius: var(--r-img); overflow: hidden; aspect-ratio: 16 / 9; box-shadow: var(--card-edge), var(--shadow-2); background: var(--surface); }
@@ -334,3 +386,5 @@ h1 .hl, h2 .hl { display: inline-block; line-height: 1.02; padding: 0.06em 0.14e
 .legal p, .legal li { color: var(--muted); max-width: 68ch; }
 .legal ul { padding-left: 20px; display: grid; gap: 6px; }
 .legal strong { color: var(--text); }
+.legal-short { padding: 22px 24px; border-radius: var(--r-card, 18px); background: var(--card-fill, var(--surface)); box-shadow: var(--card-edge), var(--shadow-1); }
+.legal-short li { color: var(--text); }

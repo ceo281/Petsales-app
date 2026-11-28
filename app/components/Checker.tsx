@@ -152,6 +152,7 @@ const RULES = [
 export default function Checker({ keys, initialTotal }: { keys: Keys; initialTotal: number | null }) {
   // Running total of real checks (null when the counter store can't be reached).
   const [total, setTotal] = useState<number | null>(initialTotal);
+  const [bump, setBump] = useState(false);
   // Only count checks that actually run on this server today.
   const CHECK_COUNT = AREAS.reduce((n, a) => n + a.items.filter((i) => isOn(i, keys)).length, 0);
   const pending = AREAS.reduce((n, a) => n + a.items.filter((i) => !isOn(i, keys)).length, 0);
@@ -237,7 +238,7 @@ export default function Checker({ keys, initialTotal }: { keys: Keys; initialTot
       }
       if (!res.ok) throw new Error(data.error || "The check didn't finish. Please try again.");
       setReport(data);
-      if (typeof data.total === "number") setTotal(data.total);
+      if (typeof data.total === "number") { setTotal(data.total); setBump(true); }
     } catch (e) {
       setError((e as Error).message || "The check didn't finish. Please try again.");
     } finally {
@@ -247,7 +248,7 @@ export default function Checker({ keys, initialTotal }: { keys: Keys; initialTot
 
   function needsAck() {
     if (ack) return false;
-    setAckError("Tick the box to confirm you understand what this check is, then try again.");
+    setAckError("Tick the box above first, then hit check.");
     document.getElementById("ack")?.focus();
     return true;
   }
@@ -293,9 +294,8 @@ export default function Checker({ keys, initialTotal }: { keys: Keys; initialTot
           aria-invalid={!!ackError} aria-describedby={ackError ? "ack-err" : undefined}
         />
         <span>
-          I understand this is an <strong>automated check for warning signs</strong>, not proof that a seller is a scammer
-          or genuine, and not advice. I&apos;ll check the pet and seller myself before paying, and I agree to the{" "}
-          <a href="/terms" target="_blank" rel="noreferrer">Terms of use</a>.
+          Got it: this spots <strong>warning signs</strong>, it doesn&apos;t prove anything. I&apos;ll still check the pet and
+          seller myself before I pay. <a href="/terms" target="_blank" rel="noreferrer">Terms</a>
         </span>
       </label>
       {ackError && (
@@ -454,10 +454,22 @@ export default function Checker({ keys, initialTotal }: { keys: Keys; initialTot
         {total !== null && (
           <section className="counter" aria-label="Ads checked so far">
             <div className="wrap counter-in">
-              <span className="counter-num" aria-live="polite">{total.toLocaleString("en-AU")}</span>
-              <span className="counter-label">
-                {total === 1 ? "pet ad checked" : "pet ads checked"} by Australian buyers so far
-              </span>
+              {/* Soft-UI dial: bezel, recessed well lit teal, raised knob. Pulses once when the total goes up. */}
+              <div className="counter-stage">
+                <div className="dial-bezel">
+                  <div className="dial-well">
+                    <div className={`dial-knob${bump ? " dial-bump" : ""}`} onAnimationEnd={() => setBump(false)}>
+                      <span className={`dial-num${String(total).length > 4 ? " dial-num-sm" : ""}`} aria-live="polite">
+                        {total.toLocaleString("en-AU")}
+                      </span>
+                      <span className="dial-unit" aria-hidden="true">checks</span>
+                    </div>
+                  </div>
+                </div>
+                <p className="counter-label">
+                  {total === 1 ? "pet ad checked" : "pet ads checked"} by Australian buyers so far
+                </p>
+              </div>
             </div>
           </section>
         )}
@@ -622,12 +634,11 @@ export default function Checker({ keys, initialTotal }: { keys: Keys; initialTot
           <img src="/logo@720.png" alt="PetSales.com.au" width={120} height={52} style={{ width: 120, height: "auto" }} loading="lazy" />
           <div className="footer-text">
             <p>
-              PetSales Scam Checker is an automated tool that looks for common warning signs in pet ads. It gives general
-              information only. It can&apos;t prove a seller is honest or that they&apos;re a scammer: a high score isn&apos;t a
-              guarantee, and a low score isn&apos;t an accusation. Always see the pet in person and verify the seller before paying.
+              Scam Checker looks for the warning signs common in pet scams. It&apos;s a helping hand, not a verdict: a good
+              score isn&apos;t a guarantee and a low one isn&apos;t an accusation. Meet the pet and check the seller before you pay.
             </p>
             <p className="footer-links">
-              <a href="/terms">Terms of use and disclaimer</a>
+              <a href="/terms">Terms</a>
               <a href="https://www.scamwatch.gov.au/report-a-scam" target="_blank" rel="noreferrer">Report a scam to Scamwatch</a>
             </p>
           </div>
