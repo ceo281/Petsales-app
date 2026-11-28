@@ -27,6 +27,8 @@ export type Signal = {
   label: string;
   detail?: string;
   links?: { title: string; url: string }[];
+  /** A value the buyer should copy and paste into an official register. */
+  copy?: string;
 };
 
 export type CheckResult = {

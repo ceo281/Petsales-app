@@ -3,7 +3,9 @@
 import { useEffect, useState } from "react";
 import {
   ArrowSquareOut,
+  Check,
   CheckCircle,
+  Copy,
   MagnifyingGlass,
   MinusCircle,
   Question,
@@ -48,6 +50,28 @@ export function ScoreRing({ score, color, size = 132 }: { score: number; color: 
   );
 }
 
+function CopyValue({ value }: { value: string }) {
+  const [copied, setCopied] = useState(false);
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      /* clipboard blocked: the number is still visible to copy by hand */
+    }
+  }
+  return (
+    <div className="copy">
+      <code>{value}</code>
+      <button type="button" onClick={copy} aria-live="polite">
+        {copied ? <Check size={16} weight="bold" aria-hidden="true" /> : <Copy size={16} aria-hidden="true" />}
+        {copied ? "Copied" : "Copy number"}
+      </button>
+    </div>
+  );
+}
+
 export function SignalRow({ s }: { s: Signal }) {
   const kind = s.points < 0 ? "neg" : s.points > 0 ? "pos" : "zero";
   const Icon = kind === "neg" ? WarningCircle : kind === "pos" ? CheckCircle : Question;
@@ -57,6 +81,7 @@ export function SignalRow({ s }: { s: Signal }) {
       <div>
         <div className="sig-label">{s.label}</div>
         {s.detail && <div className="sig-detail">{s.detail}</div>}
+        {s.copy && <CopyValue value={s.copy} />}
         {s.links && s.links.length > 0 && (
           <div className="sig-links">
             {s.links.map((l, i) => (

@@ -47,12 +47,43 @@ export function textCheck(l: Listing): CheckResult {
  * "breeder identification number" (BIN); QLD "supply number"; SA DACO
  * registration number.
  */
-const STATE_ID: Partial<Record<NonNullable<Extracted["state"]>, { name: string; lookup?: string }>> = {
-  VIC: { name: "Pet Exchange Register source number", lookup: "https://per.animalwelfare.vic.gov.au/" },
-  NSW: { name: "breeder identification number (BIN)", lookup: "https://www.petregistry.nsw.gov.au/" },
-  QLD: { name: "supply number / breeder ID", lookup: "https://www.daf.qld.gov.au/business-priorities/biosecurity/animal-biosecurity-welfare/animal-health-pests-diseases/dog-breeder-registration" },
-  SA: { name: "DACO breeder registration number", lookup: "https://www.dogandcatboard.com.au/" },
+/**
+ * Official public lookups. NSW and QLD protect theirs with a CAPTCHA and SA's
+ * refuses automated requests, so we do NOT query them from the server; we hand
+ * the buyer the number and a direct link, plus what a valid result looks like.
+ * To automate, PetSales would need data-access agreements with each state.
+ */
+type Register = { name: string; register: string; lookup: string; expect: string };
+const STATE_ID: Partial<Record<NonNullable<Extracted["state"]>, Register>> = {
+  VIC: {
+    name: "Pet Exchange Register source number",
+    register: "Victorian Pet Exchange Register",
+    lookup: "https://per.animalwelfare.vic.gov.au/",
+    expect: "A real number shows as valid, with a Victorian council name. It won't show the seller's name.",
+  },
+  NSW: {
+    name: "breeder identification number (BIN)",
+    register: "NSW Pet Registry buyer search",
+    lookup: "https://www.petregistry.nsw.gov.au/",
+    expect: "It should show as active, with any business name the breeder registered. Suspended or cancelled means walk away.",
+  },
+  QLD: {
+    name: "supply number",
+    register: "Queensland Dog Breeder Register",
+    lookup: "https://qdbr.dpi.qld.gov.au/supply-number-search",
+    expect: "It should show as valid and name the breeder. Check that name matches the seller.",
+  },
+  SA: {
+    name: "DACO breeder registration number",
+    register: "SA Dogs and Cats Online",
+    lookup: "https://www.dogsandcatsonline.com.au/",
+    expect: "The breeder should appear as registered. Check the name matches the seller.",
+  },
 };
+const ALL_REGISTERS = (Object.keys(STATE_ID) as (keyof typeof STATE_ID)[]).map((s) => ({
+  title: `${s}: ${STATE_ID[s]!.register}`,
+  url: STATE_ID[s]!.lookup,
+}));
 
 export function breederIdCheck(l: Listing, x: Extracted): CheckResult {
   const text = `${l.title}\n${l.description}\n${l.rawText}`;
@@ -64,21 +95,33 @@ export function breederIdCheck(l: Listing, x: Extracted): CheckResult {
   const isDogOrCat = /\b(puppy|puppies|pup|pups|dog|kitten|kittens|cat)\b/i.test(text);
 
   if (idMatch) {
+    const number = idMatch[idMatch.length - 1].replace(/\s|-/g, "").toUpperCase();
+    const isMicrochip = /microchip/i.test(idMatch[1]);
     signals.push({
-      points: 6,
-      label: "Breeder / source / microchip number is shown",
-      detail: `Found "${idMatch[0].trim()}". A number alone proves nothing. Look it up on the official register and check the name matches.`,
-      links: req?.lookup ? [{ title: `Verify on the ${x.state} register`, url: req.lookup }] : undefined,
+      // Shown, not verified: a small credit only. Scammers copy real breeders' numbers.
+      points: 4,
+      label: isMicrochip ? `Microchip number shown: ${number}` : `Breeder number shown: ${number}. Look it up before you pay`,
+      detail: req
+        ? `Copy the number and search it on the ${req.register}. ${req.expect} Scammers often copy a real breeder's number, so the name must match the person you're dealing with.`
+        : "Copy the number and search it on the register for the seller's state. Scammers often copy a real breeder's number, so the name must match the person you're dealing with.",
+      copy: number,
+      links: req ? [{ title: `Look it up: ${req.register}`, url: req.lookup }] : ALL_REGISTERS,
     });
+    if (x.state === "NSW" && !isMicrochip && !/^B\d{9}$/.test(number))
+      signals.push({
+        points: 0,
+        label: `${number} doesn't look like a NSW breeder number`,
+        detail: "NSW breeder numbers usually start with B followed by 9 digits. It may be a microchip or another state's number. Ask the seller.",
+      });
   } else if (req && isDogOrCat) {
     signals.push({
       points: -15,
       label: `No ${req.name} in the ad`,
       detail: `Dog and cat ads in ${x.state} must show this number by law. Ask the seller for it and verify it before paying anything.`,
-      links: req.lookup ? [{ title: `${x.state} register`, url: req.lookup }] : undefined,
+      links: [{ title: `${req.register}`, url: req.lookup }],
     });
   } else if (isDogOrCat) {
-    signals.push({ points: -3, label: "No breeder or microchip number shown", detail: "Ask for one and verify it." });
+    signals.push({ points: -3, label: "No breeder or microchip number shown", detail: "Ask the seller for their breeder number and look it up on their state's register.", links: ALL_REGISTERS });
   }
   return { id: "breeder", name: "Breeder ID / microchip check", status: "ran", signals };
 }
