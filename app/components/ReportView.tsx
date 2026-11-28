@@ -48,7 +48,7 @@ export function ScoreRing({ score, color, size = 132 }: { score: number; color: 
   );
 }
 
-function SignalRow({ s }: { s: Signal }) {
+export function SignalRow({ s }: { s: Signal }) {
   const kind = s.points < 0 ? "neg" : s.points > 0 ? "pos" : "zero";
   const Icon = kind === "neg" ? WarningCircle : kind === "pos" ? CheckCircle : Question;
   return (
@@ -73,7 +73,9 @@ function SignalRow({ s }: { s: Signal }) {
   );
 }
 
-export function ScoreHeader({ r, compact = false }: { r: Pick<Report, "score" | "band" | "confidence" | "listing">; compact?: boolean }) {
+type HeaderData = Pick<Report, "score" | "band" | "confidence"> & { listing: { title?: string; priceText?: string } };
+
+export function ScoreHeader({ r, compact = false }: { r: HeaderData; compact?: boolean }) {
   const b = BAND[r.band];
   const pct = Math.round(r.confidence * 100);
   return (

@@ -55,7 +55,7 @@ a:hover { text-decoration-thickness: 2px; }
 
 /* ------------------------------------------------------------------ nav */
 .nav { position: sticky; top: 0; z-index: 10; background: rgb(16 37 59 / 0.86); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-bottom: 1px solid var(--line); }
-.nav-in { height: 68px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.nav-in { height: 80px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .brand { display: flex; align-items: center; gap: 12px; color: var(--text); text-decoration: none; }
 .brand img { width: 38px; height: 38px; border-radius: 50%; }
 .brand-name { font-weight: 700; font-size: 1.1rem; letter-spacing: -0.01em; }

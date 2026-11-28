@@ -90,12 +90,13 @@ export function priceCheck(l: Listing, x: Extracted): CheckResult {
   if (l.price === undefined)
     return { id: "price", name: "Price vs market", status: "skipped", note: "No price found", signals };
 
-  const range = `typical AU range ~$${breed.low.toLocaleString()} to $${breed.high.toLocaleString()}`;
-  if (l.price <= 50) signals.push({ points: -15, label: `$${l.price} for a ${x.breed} is not a real price`, detail: range });
+  const name = (x.breed || "").replace(/\b\w/g, (ch) => ch.toUpperCase());
+  const range = `Typical Australian price is about $${breed.low.toLocaleString()} to $${breed.high.toLocaleString()}`;
+  if (l.price <= 50) signals.push({ points: -15, label: `$${l.price} for a ${name} is not a real price`, detail: range });
   else if (l.price < breed.low * 0.4)
-    signals.push({ points: -25, label: `Price far below market for a ${x.breed} ($${l.price})`, detail: `${range}. Too-good-to-be-true pricing is the #1 pet-scam lure.` });
+    signals.push({ points: -25, label: `Price far below market for a ${name} ($${l.price})`, detail: `${range}. Too-good-to-be-true pricing is the most common pet-scam lure.` });
   else if (l.price < breed.low * 0.7)
-    signals.push({ points: -10, label: `Price well below market for a ${x.breed} ($${l.price})`, detail: range });
-  else signals.push({ points: 3, label: `Price is in a plausible range for a ${x.breed}`, detail: range });
+    signals.push({ points: -10, label: `Price well below market for a ${name} ($${l.price})`, detail: range });
+  else signals.push({ points: 3, label: `Price is in a plausible range for a ${name}`, detail: range });
   return { id: "price", name: "Price vs market", status: "ran", signals };
 }
